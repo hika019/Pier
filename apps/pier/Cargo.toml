@@ -1,0 +1,15 @@
+[package]
+name = "pier"
+description = "Pier: a digital asset browser for the Craft Apps"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+pier-ui-egui = { workspace = true }
+egui = { workspace = true }
+eframe = { workspace = true, features = ["wgpu", "accesskit", "default_fonts", "wayland", "x11"] }

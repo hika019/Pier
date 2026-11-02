@@ -1,0 +1,64 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "apps/*"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+license = "MIT"
+rust-version = "1.95"
+repository = "https://github.com/hika019/Pier"
+
+[workspace.dependencies]
+pier-ui-egui = { path = "crates/ui-egui" }
+pier-engine = { path = "crates/engine" }
+pier-ui-driver = { path = "crates/ui-driver" }
+eframe = { version = "0.37", default-features = false }
+egui = { version = "0.37", default-features = false }
+egui_kittest = "0.37"
+# Shared Craft libraries, pinned by immutable revision (AGENTS.md).
+craft-menu = { git = "https://github.com/storytold/craft-libs", rev = "006b50d2ae65f8525e933e82fad1a1fe4e89391f" }
+craft-keymap = { git = "https://github.com/storytold/craft-libs", rev = "006b50d2ae65f8525e933e82fad1a1fe4e89391f", features = ["egui"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff"] }
+kamadak-exif = "0.6"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+sys-locale = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+cognitive_complexity = "deny"
+too_many_arguments = "deny"
+wildcard_imports = "deny"
+dbg_macro = "warn"
+todo = "warn"
+
+[profile.dev.package."*"]
+opt-level = 2
+debug = false
+
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+# The Craft Apps' egui family and winit, on the same reviewed fork commits as craft-libs, PhotoCraft and
+# ArtCraft Launcher (one egui in the build).
+[patch.crates-io]
+ecolor = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+emath = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+epaint = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+epaint_default_fonts = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui-winit = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui-wgpu = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui_glow = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui_kittest = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+eframe = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+winit = { git = "https://github.com/storytold/winit.git", rev = "a517b3846ee8457d84ee4975110bfda6797c44dc" }

@@ -1,0 +1,23 @@
+[package]
+name = "pier-ui-egui"
+description = "Pier's egui shell: the Bridge-style window, panels, workspaces and theme"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+pier-engine = { workspace = true }
+egui = { workspace = true, features = ["default_fonts"] }
+sys-locale = { workspace = true }
+chrono = { workspace = true }
+craft-menu = { workspace = true }
+craft-keymap = { workspace = true }
+
+[dev-dependencies]
+pier-engine = { workspace = true }
+egui_kittest = { workspace = true, features = ["wgpu", "snapshot"] }
+image = { workspace = true }

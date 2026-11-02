@@ -1,0 +1,20 @@
+[package]
+name = "pier-ui-driver"
+description = "Drives Pier offscreen with real input (mouse, keys), for scenario tests and AI debugging: PNGs and state as JSON"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+pier-ui-egui = { workspace = true }
+pier-engine = { workspace = true }
+egui = { workspace = true }
+egui_kittest = { workspace = true, features = ["wgpu", "snapshot"] }
+image = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
