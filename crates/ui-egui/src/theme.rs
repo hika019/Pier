@@ -18,12 +18,13 @@ pub enum Brightness {
 impl Brightness {
     pub const ALL: [Self; 4] = [Self::Darkest, Self::Dark, Self::Light, Self::Lightest];
 
-    pub fn label(self) -> &'static str {
+    pub fn name(self) -> crate::i18n::S {
+        use crate::i18n::S;
         match self {
-            Self::Darkest => "最も暗い",
-            Self::Dark => "暗い",
-            Self::Light => "明るい",
-            Self::Lightest => "最も明るい",
+            Self::Darkest => S::BrightnessDarkest,
+            Self::Dark => S::BrightnessDark,
+            Self::Light => S::BrightnessLight,
+            Self::Lightest => S::BrightnessLightest,
         }
     }
 

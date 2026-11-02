@@ -30,7 +30,10 @@ cargo run -p pier-ui-driver --bin pier-drive -- --steps '[
 
 - オプション：`--script <file>` / `--steps <json>`、`--dir <folder>`（省略時は自作の風景画で作るデモフォルダー）、
   `--out-dir <dir>`（既定 `target/pier-drive`）、`--workspace <id>`、`--lang en|ja`、`--theme darkest|dark|light|lightest`、
-  `--size 1440x900`、`--scale 1`。
+  `--size 1440x900`、`--scale 1`、`--installed all|none|photocraft,lightcraft,...`（偽のデスクトップで「インストール済み」と
+  報告する Craft App。既定 `all`）。
+- **アプリは起動しない。** 起動とアプリ検出は `pier_engine::craft::Desktop` を通り、ドライバーは偽物
+  （`pier_ui_driver::desktop::FakeDesktop`）に差し替える。Pier が起動しようとしたものは状態 JSON の `launches` に残る。
 - 最後に状態 JSON を出力します。失敗した手順があれば `FAILED step N (...)` を出して終了コード 1。
 
 ### 手順（op）
@@ -56,7 +59,16 @@ cargo run -p pier-ui-driver --bin pier-drive -- --steps '[
 ### 状態 JSON
 
 `workspace`、`view`、`folder`、`loading`、`visible`（表示中のファイル名）、`selection`、`dialog`、`dialogRect`（開いているダイアログの `[x, y, w, h]`）、`fullScreen`、`toast`、
-`thumbSize`、`panelsHidden`、`pointer`、`groups`（各パネルグループの `id`・`panels`・`active`・`rect [x, y, w, h]`）。
+`thumbSize`、`panelsHidden`、`pointer`、`groups`（各パネルグループの `id`・`panels`・`active`・`rect [x, y, w, h]`）、
+`launches`（起動要求：`{"app": "PhotoCraft", "files": [...]}`、`{"default": ...}`、`{"reveal": ...}`）。
+
+### 入力の再現について
+
+- 修飾キーは、実アプリと同じく `ModifiersChanged` で押下状態として送る（アプリはボタンイベントの修飾キーではなく入力状態を読むため。
+  以前は ⌘クリックが普通のクリックになっていた）。
+- クリックとキーのあとに 1 フレーム描き直す（実アプリも入力のあとに再描画する）。そうしないとアクセシビリティツリーが 1 フレーム古く、
+  直後の `click {label}` が切り替え前の画面を押す。
+- 同じ場所を 0.3 秒以内に 2 回押すとダブルクリックになる。別々のクリックにしたいときは `frames` を 30 挟む。
 
 ## AI が調査するときの流れ
 

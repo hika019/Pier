@@ -168,8 +168,8 @@ Bridge の挙動が不明確な項目は「要観察」と書きます。実装�
 | ID | 要件 | 優先 | 状態 |
 |---|---|---|---|
 | CRF-01 | インストール済み Craft Apps の検出（ArtCraft Launcher と同じ探索順序） | P0 | 部分 |
-| CRF-02 | ダブルクリック／ファイル › 開くで、ファイルの種類に関連付けられたアプリ（Craft App 優先、なければ OS 既定）で開く | P0 | 部分 |
-| CRF-03 | ファイルの種類の関連付け（環境設定）：拡張子ごとに Craft App / OS 既定 / 他アプリを選択 | P1 | 未 |
+| CRF-02 | ダブルクリック／ファイル › 開く／Return／⌘↓で、Pier 自前の関連付け表のアプリで開く（OS の関連付けには従わない。Bridge と同じ）。画像・raw・PSD は PhotoCraft（[craft-integration.md](craft-integration.md) §1）。1 アプリ 1 回の起動で、そのアプリのファイルをまとめて渡す | P0 | 部分 |
+| CRF-03 | ファイルの種類の関連付け（環境設定）：拡張子ごとに Craft App / OS 既定 / 他アプリを選択。既定に戻す（ヘルプ外の情報で要観察） | P1 | 未 |
 | CRF-04 | 指定アプリで開く（ファイル › 指定アプリで開く）：候補一覧に Craft Apps を先頭表示 | P0 | 部分 |
 | CRF-05 | Camera Raw で開く（Cmd/Ctrl+R）：既定は LightCraft、設定で PhotoCraft の Camera Raw | P1 | 未 |
 | CRF-06 | 未インストール時の誘導：説明ダイアログ → ArtCraft Launcher を起動／ダウンロードページを開く／アプリの GitHub Releases を開く | P0 | 部分 |
@@ -195,7 +195,7 @@ Bridge の挙動が不明確な項目は「要観察」と書きます。実装�
 | WSP-02 | パネルのドッキング・タブ化・フローティング・サイズ変更（`craft-ui` のドッキング） | P0 | 部分 |
 | WSP-03 | 新規ワークスペースの保存（ウィンドウ位置・サイズ・並べ替えを含めるか）、削除、初期化、ショートカット（Cmd/Ctrl+F1〜F6） | P1 | 未 |
 | WSP-04 | UI テーマ（明るさ 4 段階）、背景色、UI テキストサイズ | P1 | 部分 |
-| PRF-01 | 環境設定：一般、サムネイル、再生、メタデータ、キーワード、ラベル、ファイルの種類の関連付け、キャッシュ、メディアキャッシュ、インターフェイス、高度な設定、出力 | P0 | 部分 |
+| PRF-01 | 環境設定：ページは Bridge 2026 macOS と同じ順（一般、詳細設定、以下英語名の A–Z：Applications、Cache、Cache Management、Content、Export、File Type Associations、Interface、Keywords、Labels and Ratings、Media Cache、Metadata、Output、Playback、Quick Actions、Startup Scripts、Thumbnails、Workflow）。下部に［キャンセル］［OK］。OK で確定、キャンセル・Esc で破棄（ヘルプ記載、実機未確認。[ui-design.md](ui-design.md) §6.1） | P0 | 部分 |
 | PRF-02 | 設定の保存は `craft-settings`（config.toml、アトミック保存、破損時の復旧、移行） | P0 | 未 |
 | PRF-03 | 環境設定のリセット（起動時に修飾キー：Bridge は Ctrl/Cmd+Alt/Opt 押下で初期化ダイアログ） | P1 | 未 |
 | PRF-04 | キーボードショートカットのカスタマイズ（`craft-keymap`） | P2 | 未 |

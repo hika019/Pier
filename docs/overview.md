@@ -1,6 +1,6 @@
 # 製品概要
 
-> **最終更新:** 2026-11-02 · **対象:** Adobe Bridge 2026（観察による参照） · **状態:** 設計段階
+> **最終更新:** 2026-11-03 · **対象:** Adobe Bridge 2026（観察による参照） · **状態:** 設計段階
 
 ## 1. Pier とは
 
@@ -61,7 +61,7 @@ Pier はクリエイティブ素材（写真、raw、PSD、ベクター、レイ
 | 対象外 | 理由 / 代替 |
 |---|---|
 | 画素編集・現像 | Craft Apps（PhotoCraft、LightCraft）に委譲 |
-| Bridge 内蔵の Camera Raw ホスティング | LightCraft（または PhotoCraft の Camera Raw フィルター）で開く |
+| Bridge 内蔵の Camera Raw ホスティング（⌘R） | LightCraft で開く（dashboard #3）。ダブルクリックは Bridge と同じく PhotoCraft（Photoshop 相当）が Camera Raw ダイアログを出す |
 | Creative Cloud ライブラリ、Adobe Stock への公開、Adobe アカウント連携 | Adobe のサービスに依存するため。将来の拡張点として残す |
 | Adobe Firefly / Sensei などの AI クイックアクション | 初期対象外。将来 `craft-ai-integrations` 経由で検討（[decisions.md](decisions.md) ADR-010） |
 | ExtendScript（JavaScript）による Bridge スクリプト | JS を使わない方針。代わりに JSON コントロールチャネル・MCP・CLI |
@@ -74,8 +74,9 @@ Bridge が Adobe 製品へ受け渡す箇所は、次の Craft App に置き換�
 
 | Bridge での連携先 | Pier での連携先 | 主な用途 |
 |---|---|---|
-| Photoshop | **PhotoCraft** | PSD・画像を開く、バッチ、画像プロセッサー、レイヤーとして読み込み |
-| Camera Raw | **LightCraft**（既定）／PhotoCraft の Camera Raw | raw 現像 |
+| Photoshop | **PhotoCraft** | 画像・raw・PSD を開く（ダブルクリック）、バッチ、画像プロセッサー、レイヤーとして読み込み |
+| Photoshop の Camera Raw（raw をダブルクリック） | **PhotoCraft** の Camera Raw | raw を開くときの現像 |
+| Bridge 内の Camera Raw（⌘R） | **LightCraft**（dashboard #3） | raw 現像 |
 | Lightroom | **LightCraft** | カタログへの読み込み |
 | Illustrator | **VectorCraft** | AI / SVG / EPS を開く、画像トレース |
 | InDesign | **DesignCraft** | INDD / IDML を開く、コンタクトシート |

@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, Rect, Vec2, pos2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
+use pier_engine::craft::CraftApp;
 use pier_ui_egui::PierShell;
 use pier_ui_egui::i18n::{Lang, LangSetting};
 use pier_ui_egui::theme::Brightness;
@@ -27,11 +28,21 @@ pub struct Config {
     pub workspace: Workspace,
     pub lang: Lang,
     pub theme: Brightness,
+    /// The Craft Apps the fake desktop reports as installed. Nothing is ever started.
+    pub installed: Vec<CraftApp>,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { dir: None, size: egui::vec2(1440.0, 900.0), scale: 1.0, workspace: Workspace::Essentials, lang: Lang::En, theme: Brightness::Darkest }
+        Self {
+            dir: None,
+            size: egui::vec2(1440.0, 900.0),
+            scale: 1.0,
+            workspace: Workspace::Essentials,
+            lang: Lang::En,
+            theme: Brightness::Darkest,
+            installed: Vec::new(),
+        }
     }
 }
 
@@ -46,6 +57,8 @@ pub struct Widget {
 pub struct Driver {
     harness: Harness<'static, PierShell>,
     pub dir: PathBuf,
+    /// What Pier asked the desktop to start, in order.
+    pub launches: crate::desktop::Launches,
     pointer: Pos2,
     modifiers: Modifiers,
 }
@@ -56,7 +69,9 @@ impl Driver {
             Some(d) => d,
             None => crate::demo::temp("driver")?,
         };
+        let launches = crate::desktop::Launches::default();
         let mut shell = PierShell::new(dir.clone());
+        shell.set_desktop(Box::new(crate::desktop::FakeDesktop::new(config.installed, launches.clone())));
         shell.ui_state_mut().workspace = config.workspace;
         shell.ui_state_mut().lang = LangSetting::Fixed(config.lang);
         shell.ui_state_mut().brightness = config.theme;
@@ -65,7 +80,7 @@ impl Driver {
             .with_pixels_per_point(config.scale)
             .with_step_dt(FRAME_DT)
             .build_ui_state(|ui, s: &mut PierShell| s.ui(ui), shell);
-        let mut d = Self { harness, dir, pointer: pos2(-10.0, -10.0), modifiers: Modifiers::NONE };
+        let mut d = Self { harness, dir, launches, pointer: pos2(-10.0, -10.0), modifiers: Modifiers::NONE };
         d.settle();
         Ok(d)
     }
@@ -131,10 +146,16 @@ impl Driver {
 
     pub fn click_at(&mut self, at: Pos2, button: PointerButton, modifiers: Modifiers) {
         self.move_to(at);
+        // The app reads held keys from the input state, which the OS updates with ModifiersChanged;
+        // the modifiers on the button event alone are not seen.
         self.modifiers = modifiers;
+        self.harness.event(Event::ModifiersChanged(modifiers));
         self.press(button, true);
         self.press(button, false);
         self.modifiers = Modifiers::NONE;
+        self.harness.event(Event::ModifiersChanged(Modifiers::NONE));
+        // The frame that handled the click changed state after drawing; the app repaints, and so do we.
+        self.harness.step();
     }
 
     /// Two clicks a frame apart, as a real double-click arrives (egui needs separate frames to see two).
@@ -168,6 +189,7 @@ impl Driver {
 
     pub fn key(&mut self, key: Key, modifiers: Modifiers) {
         self.harness.key_press_modifiers(modifiers, key);
+        self.harness.step();
         self.harness.step();
     }
 
@@ -238,6 +260,7 @@ impl Driver {
             "panelsHidden": u.panels_hidden,
             "pointer": [self.pointer.x, self.pointer.y],
             "groups": groups,
+            "launches": self.launches.json(),
         })
     }
 }

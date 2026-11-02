@@ -14,7 +14,7 @@ use crate::shell::{Action, PierShell, fmt_size, fmt_time, label_color};
 use crate::state::{Label, date_key};
 use crate::theme::Tokens;
 
-const ROW: f32 = 20.0;
+pub(crate) const ROW: f32 = 20.0;
 const TREE_INDENT: f32 = 14.0;
 /// Folders panel depth limit (a symbolic-link loop can't recurse forever).
 const MAX_TREE_DEPTH: usize = 48;
@@ -54,7 +54,7 @@ pub(crate) fn soon_banner(ui: &mut Ui, t: &Tokens) {
 }
 
 /// A full-width row with a hover/selected background; returns its rect and response.
-fn row(ui: &mut Ui, t: &Tokens, selected: bool, id: impl std::hash::Hash + std::fmt::Debug, label: &str) -> (Rect, egui::Response) {
+pub(crate) fn row(ui: &mut Ui, t: &Tokens, selected: bool, id: impl std::hash::Hash + std::fmt::Debug, label: &str) -> (Rect, egui::Response) {
     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), ROW), Sense::hover());
     let resp = ui.interact(rect, Id::unique(id), Sense::click());
     resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::ListItem, true, selected, label));

@@ -6,12 +6,14 @@
 //! ```
 //! Options: `--script <file>` or `--steps <json>`, `--dir <folder>` (default: a fresh demo folder),
 //! `--out-dir <dir>` (default `target/pier-drive`), `--workspace <id>`, `--lang en|ja`,
-//! `--theme darkest|dark|light|lightest`, `--size 1440x900`, `--scale 1`.
+//! `--theme darkest|dark|light|lightest`, `--size 1440x900`, `--scale 1`, `--installed all|none|photocraft,lightcraft,...`
+//! (the Craft Apps the fake desktop reports; nothing is ever started, launches show in the state JSON).
 //! Ends with the window state as JSON. Exits 1 when a step fails (an assertion, a missing label).
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use pier_engine::craft;
 use pier_ui_driver::{Config, Driver, script};
 use pier_ui_egui::i18n::Lang;
 use pier_ui_egui::theme::Brightness;
@@ -52,6 +54,10 @@ fn run() -> Result<(), String> {
             Some("light") => Brightness::Light,
             Some("lightest") => Brightness::Lightest,
             _ => Brightness::Darkest,
+        },
+        installed: match arg(&args, "--installed").as_deref() {
+            None | Some("all") => craft::ALL.to_vec(),
+            Some(ids) => craft::ALL.into_iter().filter(|a| ids.split(',').any(|id| id == a.id)).collect(),
         },
     };
     let out_dir = PathBuf::from(arg(&args, "--out-dir").unwrap_or_else(|| "target/pier-drive".into()));

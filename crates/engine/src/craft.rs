@@ -31,12 +31,13 @@ impl CraftApp {
     }
 }
 
-/// The default association: which Craft App opens a kind, or `None` for the OS default app
-/// (plain images follow the OS, as Bridge does; dashboard.md #2).
+/// The default association: which Craft App opens a kind (Open, double-click), or `None` for the
+/// OS default app. Bridge keeps its own association table rather than following the OS, and opens
+/// images and camera raws in Photoshop (raws through Camera Raw first); PhotoCraft does both
+/// (docs/craft-integration.md §1).
 pub fn app_for(kind: AssetKind) -> Option<CraftApp> {
     match kind {
-        AssetKind::Layered => Some(PHOTOCRAFT),
-        AssetKind::Raw => Some(LIGHTCRAFT),
+        AssetKind::Image | AssetKind::Raw | AssetKind::Layered => Some(PHOTOCRAFT),
         AssetKind::Vector => Some(VECTORCRAFT),
         AssetKind::Layout => Some(DESIGNCRAFT),
         AssetKind::Pdf => Some(PDFCRAFT),
@@ -119,6 +120,42 @@ pub fn reveal(path: &Path) -> Result<(), String> {
     }
 }
 
+/// What Pier asked the desktop to start.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Launch {
+    App { app: PathBuf, files: Vec<PathBuf> },
+    Default(std::ffi::OsString),
+    Reveal(PathBuf),
+}
+
+/// The desktop Pier runs on: where the Craft Apps are, and how other programs are started.
+/// [`System`] is the real one; tests substitute a fake that records each [`Launch`].
+pub trait Desktop: Send {
+    fn detect(&self, app: CraftApp) -> Option<PathBuf>;
+    fn detect_launcher(&self) -> Option<PathBuf>;
+    fn launch(&mut self, launch: Launch) -> Result<(), String>;
+}
+
+pub struct System;
+
+impl Desktop for System {
+    fn detect(&self, app: CraftApp) -> Option<PathBuf> {
+        detect(app)
+    }
+
+    fn detect_launcher(&self) -> Option<PathBuf> {
+        detect_launcher()
+    }
+
+    fn launch(&mut self, launch: Launch) -> Result<(), String> {
+        match launch {
+            Launch::App { app, files } => open_in_app(&app, &files),
+            Launch::Default(target) => open_default(&target),
+            Launch::Reveal(path) => reveal(&path),
+        }
+    }
+}
+
 /// Arguments go as an array, never through a shell (docs/requirements.md NFR-S4). The child is
 /// reaped on a thread so it never lingers as a zombie.
 fn spawn(mut cmd: Command) -> Result<(), String> {
@@ -133,10 +170,12 @@ fn spawn(mut cmd: Command) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    /// Bridge opens these in Photoshop (raws through Camera Raw); the PhotoCraft column is the
+    /// same table with Photoshop replaced (docs/craft-integration.md §1).
     #[test]
-    fn plain_images_follow_the_os_and_psd_goes_to_photocraft() {
-        assert_eq!(app_for(AssetKind::Image), None);
-        assert_eq!(app_for(AssetKind::Layered), Some(PHOTOCRAFT));
-        assert_eq!(app_for(AssetKind::Raw), Some(LIGHTCRAFT));
+    fn images_and_raws_open_in_photocraft_like_bridge_opens_them_in_photoshop() {
+        for ext in ["jpg", "JPEG", "png", "tif", "tiff", "gif", "webp", "bmp", "cr3", "CR2", "nef", "arw", "dng", "raf", "orf", "rw2", "psd", "psb"] {
+            assert_eq!(app_for(AssetKind::from_extension(ext)), Some(PHOTOCRAFT), "{ext}");
+        }
     }
 }

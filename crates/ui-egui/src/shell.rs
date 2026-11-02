@@ -6,13 +6,13 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use egui::{CentralPanel, Color32, Context, Frame, Id, Key, KeyboardShortcut, Modifiers, Rect, Sense, TextureHandle, Ui, UiBuilder, Vec2, vec2};
-use pier_engine::craft::{self, CraftApp};
+use pier_engine::craft::{self, CraftApp, Desktop, Launch};
 use pier_engine::meta::MetaSummary;
 use pier_engine::{Asset, AssetKind, Event, ImageSize, Worker};
 
 use crate::i18n::{self, S, tr};
 use crate::icons::{self, Icon};
-use crate::state::{Browser, Dialog, Label, PrefPage, THUMB_MAX, THUMB_MIN, UiState, ViewMode};
+use crate::state::{Browser, Dialog, Label, PrefDraft, PrefPage, THUMB_MAX, THUMB_MIN, UiState, ViewMode};
 use crate::theme::Tokens;
 use crate::workspace::{Column, PanelId, Workspace};
 
@@ -99,6 +99,7 @@ pub struct PierShell {
     pub(crate) subfolders: HashMap<PathBuf, Option<Result<Vec<PathBuf>, String>>>,
     pub(crate) craft_apps: HashMap<&'static str, Option<PathBuf>>,
     pub(crate) launcher: Option<PathBuf>,
+    desktop: Box<dyn Desktop>,
     pub(crate) frame: u64,
     pub(crate) probe: Probe,
     pub(crate) native_menu: Option<craft_menu::NativeMenu>,
@@ -110,8 +111,7 @@ pub struct PierShell {
 
 impl PierShell {
     pub fn new(start: PathBuf) -> Self {
-        let craft_apps = craft::ALL.iter().map(|a| (a.id, craft::detect(*a))).collect();
-        Self {
+        let mut shell = Self {
             browser: Browser::new(PathBuf::new()),
             ui: UiState::default(),
             tokens: Tokens::for_brightness(crate::theme::Brightness::Darkest),
@@ -122,8 +122,9 @@ impl PierShell {
             last_wanted: HashSet::new(),
             meta: HashMap::new(),
             subfolders: HashMap::new(),
-            craft_apps,
-            launcher: craft::detect_launcher(),
+            craft_apps: HashMap::new(),
+            launcher: None,
+            desktop: Box::new(craft::System),
             frame: 0,
             probe: Probe::default(),
             native_menu: None,
@@ -131,7 +132,24 @@ impl PierShell {
             start,
             applied: None,
             cjk_font: None,
-        }
+        };
+        shell.detect_craft_apps();
+        shell
+    }
+
+    /// Replaces the desktop (where Craft Apps are found and programs started) and looks again.
+    pub fn set_desktop(&mut self, desktop: Box<dyn Desktop>) {
+        self.desktop = desktop;
+        self.detect_craft_apps();
+    }
+
+    fn detect_craft_apps(&mut self) {
+        self.craft_apps = craft::ALL.iter().map(|a| (a.id, self.desktop.detect(*a))).collect();
+        self.launcher = self.desktop.detect_launcher();
+    }
+
+    pub(crate) fn launch(&mut self, launch: Launch) -> Result<(), String> {
+        self.desktop.launch(launch)
     }
 
     pub fn probe(&self) -> &Probe {
@@ -432,8 +450,9 @@ impl PierShell {
             Action::OpenWith(app) => self.open_selection(app, true),
             Action::OpenInCameraRaw => self.open_selection(Some(craft::LIGHTCRAFT), true),
             Action::Reveal => {
-                if let Some(a) = self.browser.selected_assets().first() {
-                    self.report(craft::reveal(&a.path));
+                if let Some(path) = self.browser.selected_assets().first().map(|a| a.path.clone()) {
+                    let r = self.launch(Launch::Reveal(path));
+                    self.report(r);
                 }
             }
             Action::CloseWindow | Action::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
@@ -461,8 +480,7 @@ impl PierShell {
                 self.images.clear();
                 self.meta.clear();
                 self.subfolders.clear();
-                self.craft_apps = craft::ALL.iter().map(|a| (a.id, craft::detect(*a))).collect();
-                self.launcher = craft::detect_launcher();
+                self.detect_craft_apps();
                 self.browser.path = PathBuf::new();
                 self.navigate(p, false);
             }
@@ -471,7 +489,10 @@ impl PierShell {
                 self.ui.views.remove(&self.ui.workspace);
                 ctx.memory_mut(|m| m.reset_areas());
             }
-            Action::Preferences => self.ui.dialog = Some(Dialog::Preferences(PrefPage::General)),
+            Action::Preferences => {
+                self.ui.pref_draft = Some(PrefDraft { brightness: self.ui.brightness, lang: self.ui.lang });
+                self.ui.dialog = Some(Dialog::Preferences(PrefPage::General));
+            }
             Action::Back => {
                 if let Some(p) = self.browser.back.pop() {
                     let cur = self.browser.path.clone();
@@ -540,13 +561,13 @@ impl PierShell {
             match target {
                 None => {
                     for f in &files {
-                        let r = craft::open_default(f.as_os_str());
+                        let r = self.launch(Launch::Default(f.clone().into_os_string()));
                         self.report(r);
                     }
                 }
                 Some(app) => match self.craft_apps.get(app.id).cloned().flatten() {
                     Some(path) => {
-                        let r = craft::open_in_app(&path, &files);
+                        let r = self.launch(Launch::App { app: path, files });
                         self.report(r);
                     }
                     None => self.ui.dialog = Some(Dialog::CraftMissing { app, files }),

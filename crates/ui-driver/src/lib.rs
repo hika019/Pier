@@ -5,8 +5,10 @@
 //! - [`Driver`]: the Rust API, used by `tests/scenarios.rs`.
 //! - [`script`]: the same operations as JSON steps, run by the `pier-drive` binary.
 //! - [`demo`]: a demo folder of original, procedurally drawn images.
+//! - [`desktop`]: a fake desktop: chosen Craft Apps "installed", launches recorded, nothing started.
 
 pub mod demo;
+pub mod desktop;
 mod driver;
 pub mod script;
 
