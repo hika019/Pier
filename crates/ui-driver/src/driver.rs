@@ -256,7 +256,6 @@ impl Driver {
         Ok(w)
     }
 
-    /// Every labelled widget in the accessibility tree.
     /// Every piece of text the accessibility tree carries: names, and the text of labels (which egui
     /// puts in the node's value).
     pub fn texts(&self) -> Vec<String> {
@@ -269,6 +268,7 @@ impl Driver {
             .collect()
     }
 
+    /// Every labelled widget in the accessibility tree.
     pub fn widgets(&self) -> Vec<Widget> {
         self.harness
             .query_all_by(|n| n.label().is_some_and(|l| !l.is_empty()))

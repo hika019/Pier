@@ -529,7 +529,9 @@ fn japanese_about_is_all_japanese() {
     d.frames(3);
     let texts = d.texts();
     assert!(texts.iter().any(|t| t.contains("試作")), "{texts:?}");
-    assert!(!texts.iter().any(|t| t.contains("prototype")), "{texts:?}");
+    for english in ["prototype", "digital asset browser", "trademarks"] {
+        assert!(!texts.iter().any(|t| t.contains(english)), "{english}: {texts:?}");
+    }
     cleanup(d);
 }
 
