@@ -231,6 +231,7 @@ impl Driver {
             "visible": b.visible_assets().map(|a| a.name.clone()).collect::<Vec<_>>(),
             "selection": selection,
             "dialog": u.dialog.as_ref().map(|d| format!("{d:?}")),
+            "dialogRect": s.probe().dialog.map(rect_json),
             "fullScreen": u.full_screen.as_ref().map(name),
             "toast": u.toast.as_ref().map(|t| t.0.clone()),
             "thumbSize": u.thumb_size,

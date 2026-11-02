@@ -10,17 +10,33 @@ use crate::shell::{PierShell, kind_name};
 use crate::state::{Dialog, PrefPage};
 use crate::theme::Brightness;
 
+/// Preferences: page list width, page width and body height. One size for every page, so switching
+/// pages never moves the buttons.
+const PREF_LIST_WIDTH: f32 = 170.0;
+const PREF_PAGE_WIDTH: f32 = 470.0;
+const PREF_BODY_HEIGHT: f32 = 380.0;
+/// Room for the separator between the page list and the page.
+const PREF_SEPARATOR: f32 = 6.0;
+
+/// A row of buttons, right-aligned, exactly one button high. A layout given the dialog's whole
+/// remaining height would claim it, and a modal remembers the size its contents claimed.
+fn button_row(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
+    let size = vec2(ui.available_width(), ui.spacing().interact_size.y);
+    ui.allocate_ui_with_layout(size, egui::Layout::right_to_left(egui::Align::Center), add);
+}
+
 impl PierShell {
     pub(crate) fn dialogs_ui(&mut self, ctx: &Context) {
         let Some(dialog) = self.ui.dialog.clone() else { return };
         let t = self.tokens.clone();
         let frame = egui::Frame::NONE.fill(t.bg_panel).stroke(t.separator_stroke()).corner_radius(6).inner_margin(16);
-        let resp = Modal::new(Id::unique("pier-dialog")).frame(frame).show(ctx, |ui| match dialog {
+        let resp = Modal::new(Id::unique(("pier-dialog", std::mem::discriminant(&dialog)))).frame(frame).show(ctx, |ui| match dialog {
             Dialog::Preferences(page) => self.preferences(ui, page),
             Dialog::CraftMissing { app, files } => self.craft_missing(ui, app, &files),
             Dialog::CraftApps => self.craft_apps_dialog(ui),
             Dialog::About => self.about(ui),
         });
+        self.probe.dialog = Some(resp.response.rect);
         if resp.should_close() {
             self.ui.dialog = None;
         }
@@ -28,22 +44,23 @@ impl PierShell {
 
     fn preferences(&mut self, ui: &mut Ui, page: PrefPage) {
         let t = self.tokens.clone();
-        ui.set_width(680.0);
         ui.heading(tr(S::Preferences).trim_end_matches('…'));
         ui.add_space(8.0);
-        ui.horizontal_top(|ui| {
+        let body = vec2(PREF_LIST_WIDTH + PREF_PAGE_WIDTH + PREF_SEPARATOR + ui.spacing().item_spacing.x * 2.0, PREF_BODY_HEIGHT);
+        // The vertical separator fills the height it is offered, so offer it exactly the body's.
+        ui.allocate_ui_with_layout(body, egui::Layout::left_to_right(egui::Align::Min), |ui| {
+            ui.set_min_size(body);
             ui.vertical(|ui| {
-                ui.set_width(170.0);
+                ui.set_width(PREF_LIST_WIDTH);
                 for p in PrefPage::ALL {
-                    if ui.add_sized([170.0, 20.0], egui::Button::new(tr(p.name())).selected(p == page).frame(p == page)).clicked() {
+                    if ui.add_sized([PREF_LIST_WIDTH, 20.0], egui::Button::new(tr(p.name())).selected(p == page).frame(p == page)).clicked() {
                         self.ui.dialog = Some(Dialog::Preferences(p));
                     }
                 }
             });
-            ui.separator();
+            ui.add(egui::Separator::default().spacing(PREF_SEPARATOR));
             ui.vertical(|ui| {
-                ui.set_min_height(380.0);
-                ui.set_width(470.0);
+                ui.set_width(PREF_PAGE_WIDTH);
                 ui.label(RichText::new(tr(page.name())).strong().color(t.fg_strong));
                 ui.add_space(6.0);
                 match page {
@@ -112,7 +129,7 @@ impl PierShell {
             });
         });
         ui.separator();
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        button_row(ui, |ui| {
             if ui.button(tr(S::Ok)).clicked() {
                 ui.close();
             }
@@ -183,7 +200,7 @@ impl PierShell {
         ui.add_space(12.0);
         ui.horizontal(|ui| {
             self.launcher_button(ui);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            button_row(ui, |ui| {
                 if ui.button(tr(S::Close)).clicked() {
                     ui.close();
                 }
@@ -202,7 +219,7 @@ impl PierShell {
         ui.add_space(8.0);
         ui.label(RichText::new(tr(S::AboutTrademark)).color(t.fg_dim).small());
         ui.add_space(8.0);
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        button_row(ui, |ui| {
             if ui.button(tr(S::Ok)).clicked() {
                 ui.close();
             }

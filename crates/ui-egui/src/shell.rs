@@ -74,6 +74,8 @@ pub enum Action {
 pub struct Probe {
     /// Every tabbed panel group, in drawing order.
     pub groups: Vec<GroupProbe>,
+    /// The open modal dialog's frame, if any.
+    pub dialog: Option<Rect>,
 }
 
 #[derive(Clone, Debug)]
@@ -98,7 +100,7 @@ pub struct PierShell {
     pub(crate) craft_apps: HashMap<&'static str, Option<PathBuf>>,
     pub(crate) launcher: Option<PathBuf>,
     pub(crate) frame: u64,
-    probe: Probe,
+    pub(crate) probe: Probe,
     pub(crate) native_menu: Option<craft_menu::NativeMenu>,
     pending: Vec<Action>,
     start: PathBuf,
@@ -166,6 +168,7 @@ impl PierShell {
         self.handle_keys(&ctx, &menus);
         self.wanted.clear();
         self.probe.groups.clear();
+        self.probe.dialog = None;
         self.wanted_set.clear();
 
         let t = self.tokens.clone();

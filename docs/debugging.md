@@ -55,7 +55,7 @@ cargo run -p pier-ui-driver --bin pier-drive -- --steps '[
 
 ### 状態 JSON
 
-`workspace`、`view`、`folder`、`loading`、`visible`（表示中のファイル名）、`selection`、`dialog`、`fullScreen`、`toast`、
+`workspace`、`view`、`folder`、`loading`、`visible`（表示中のファイル名）、`selection`、`dialog`、`dialogRect`（開いているダイアログの `[x, y, w, h]`）、`fullScreen`、`toast`、
 `thumbSize`、`panelsHidden`、`pointer`、`groups`（各パネルグループの `id`・`panels`・`active`・`rect [x, y, w, h]`）。
 
 ## AI が調査するときの流れ
@@ -78,3 +78,11 @@ cargo run -p pier-ui-driver --bin pier-drive -- --steps '[
 - 切り分け：マウスを動かさず `frames` だけでも 1 フレーム 1pt ずつ縮んだので、原因は毎フレームの描画だった（実アプリではマウスを動かすたびに再描画されるため、動いて見えた）。
 - 真因：パネルグループが与えられた領域を 1pt 縮めてから確保していたため、サイズ可変パネルが毎フレーム小さい値を覚え直していた。
 - センチネル：`panels_stay_put_while_the_mouse_moves`（全ワークスペースでマウスを動かしても配置が変わらない）。
+
+## 実例：環境設定ウィンドウが伸び続ける（2026-11-03 修正）
+
+- 再現：環境設定を開いて `widgets` で OK ボタンの位置をフレームごとに測ると、1 フレームごとに下へずれ、112 フレームで画面外に出た。ページ名をクリックすると、位置がずれた後の別のページが選ばれた。
+- 切り分け：ダイアログごとに高さを測ると、伸びるのは環境設定だけ。縦の区切り線を外すと止まった。
+- 真因：ダイアログ（自動サイズのウィンドウ）は前のフレームで中身が確保した大きさを覚える。縦の区切り線が「残りの高さ全部」を確保していたため、見出しとボタン行の分が毎フレーム上乗せされた。下のボタン行（`right_to_left`）も残りの高さを全部確保するため一度伸びると縮まず、全ダイアログが同じ Id だったので次に開いたダイアログが大きさを引き継いだ。
+- 約束：ダイアログの中では「残り全部」を確保する部品（縦の区切り線、`with_layout`）に、確保してよい大きさを明示して渡す（`button_row`、環境設定の本体は固定サイズ）。
+- センチネル：`dialogs_keep_their_size_while_the_mouse_moves`、`preferences_pages_are_picked_by_clicking_their_names`、`a_dialog_does_not_inherit_the_size_of_the_previous_one`。
