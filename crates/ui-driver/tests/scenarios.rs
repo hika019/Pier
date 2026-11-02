@@ -505,3 +505,49 @@ fn a_new_preferences_session_starts_from_the_current_settings() {
     assert_eq!(d.state()["brightness"], "Darkest");
     cleanup(d);
 }
+
+/// Preferences' body is one fixed size; its page list (rows, inset and frame) fits inside it, on
+/// every page. Regression: the frame's stroke was not counted, so the list pushed the buttons down.
+#[test]
+fn preferences_contents_fit_the_size_they_were_given() {
+    let mut d = driver(Workspace::Essentials);
+    for page in PrefPage::ALL {
+        d.shell_mut().ui_state_mut().dialog = Some(Dialog::Preferences(page));
+        d.frames(3);
+        let fixed = d.state()["fixed"].clone();
+        let body = fixed.as_array().unwrap().iter().find(|f| f["what"] == "preferences body").unwrap_or_else(|| panic!("{page:?}: {fixed}"));
+        assert_eq!(body["used"], body["given"], "{page:?}");
+    }
+    cleanup(d);
+}
+
+/// No English left in the Japanese About.
+#[test]
+fn japanese_about_is_all_japanese() {
+    let mut d = Driver::new(Config { lang: Lang::Ja, ..Config::default() }).unwrap();
+    d.shell_mut().ui_state_mut().dialog = Some(Dialog::About);
+    d.frames(3);
+    let texts = d.texts();
+    assert!(texts.iter().any(|t| t.contains("試作")), "{texts:?}");
+    assert!(!texts.iter().any(|t| t.contains("prototype")), "{texts:?}");
+    cleanup(d);
+}
+
+/// Prompts still queued for missing apps are dropped when another dialog replaces them, so they do
+/// not surface later after an unrelated prompt.
+#[test]
+fn queued_prompts_go_when_another_dialog_replaces_them() {
+    let mut d = driver(Workspace::Essentials);
+    d.click_label("IMG_0412.CR3", PointerButton::Primary).unwrap();
+    d.click_at(d.find("logo.svg", false).unwrap().rect.center(), PointerButton::Primary, Modifiers::COMMAND);
+    d.key(Key::O, Modifiers::COMMAND);
+    d.shell_mut().ui_state_mut().dialog = Some(Dialog::About);
+    d.frames(3);
+    d.click_label("OK", PointerButton::Primary).unwrap();
+    let other = d.dir.join("teaser.mp4");
+    d.shell_mut().ui_state_mut().dialog = Some(Dialog::CraftMissing { app: pier_engine::craft::FILMCRAFT, files: vec![other] });
+    d.frames(3);
+    d.click_label("Cancel", PointerButton::Primary).unwrap();
+    assert!(d.state()["dialog"].is_null(), "{}", d.state()["dialog"]);
+    cleanup(d);
+}

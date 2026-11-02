@@ -28,7 +28,7 @@ cargo run -p pier-ui-driver --bin pier-drive -- --steps '[
 ]'
 ```
 
-- オプション：`--script <file>` / `--steps <json>`、`--dir <folder>`（省略時は自作の風景画で作るデモフォルダー）、
+- オプション：`--launcher yes|no`（ArtCraft Launcher をインストール済みと報告するか、既定 no）、`--script <file>` / `--steps <json>`、`--dir <folder>`（省略時は自作の風景画で作るデモフォルダー）、
   `--out-dir <dir>`（既定 `target/pier-drive`）、`--workspace <id>`、`--lang en|ja`、`--theme darkest|dark|light|lightest`、
   `--size 1440x900`、`--scale 1`、`--installed all|none|photocraft,lightcraft,...`（偽のデスクトップで「インストール済み」と
   報告する Craft App。既定 `all`）。
@@ -60,6 +60,7 @@ cargo run -p pier-ui-driver --bin pier-drive -- --steps '[
 
 `workspace`、`view`、`folder`、`loading`、`visible`（表示中のファイル名）、`selection`、`dialog`、`dialogRect`（開いているダイアログの `[x, y, w, h]`）、`fullScreen`、`toast`、
 `thumbSize`、`panelsHidden`、`pointer`、`groups`（各パネルグループの `id`・`panels`・`active`・`rect [x, y, w, h]`）、
+`brightness`、`lang`、`fixed`（固定サイズで描く領域の `given` と中身が使った `used`。食い違いは、はみ出し）、
 `launches`（起動要求：`{"app": "PhotoCraft", "files": [...]}`、`{"default": ...}`、`{"reveal": ...}`）。
 
 ### 入力の再現について
@@ -69,8 +70,9 @@ cargo run -p pier-ui-driver --bin pier-drive -- --steps '[
 - 入力（クリック・ダブルクリック・ドラッグ・スクロール・キー・文字）のあとは、egui が再描画を求める間だけフレームを進める（上限 4）。
   入力で変わった状態の描画と、新しいダイアログの最初の「見えない採寸の描画」の次の描画まで進むので、直後の `click {label}` や
   `state` は結果を見る。
-- 別々のクリックは自動で 0.5 秒（30 フレーム）空ける。egui は 0.3 秒以内の次のクリックを 2 回目（3 回目）として数えるため、
-  空けないと「別の項目を素早く押した」がダブルクリック（開く）やトリプルクリックになる。
+- クリックとダブルクリックは、直前のクリックから自動で 0.5 秒（30 フレーム）空けてから押す。egui は 0.3 秒以内の次のクリックを
+  2 回目（3 回目）として数えるため、空けないと「別の項目を素早く押した」がダブルクリック（開く）やトリプルクリックになる。
+  ドラッグは動きを伴うのでクリックとして数えられず、待たない。
 - 偽のデスクトップ：`Config { installed, launcher, .. }`（pier-drive では `--installed`、`--launcher yes`）。テスト中に
   `driver.installed.install(app)` でインストールした状態にできる（F5 の再検出の確認用）。
 

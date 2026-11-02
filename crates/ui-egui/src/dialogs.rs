@@ -40,9 +40,13 @@ fn button_row(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
 
 impl PierShell {
     pub(crate) fn dialogs_ui(&mut self, ctx: &Context) {
-        // The draft lives exactly as long as Preferences is the open dialog, however it was opened.
+        // The draft lives exactly as long as Preferences is the open dialog, and the queue of missing
+        // apps as long as their prompts are, however the dialog was replaced.
         if !matches!(self.ui.dialog, Some(Dialog::Preferences(_))) {
             self.ui.pref_draft = None;
+        }
+        if !matches!(self.ui.dialog, Some(Dialog::CraftMissing { .. })) {
+            self.ui.craft_missing_queue.clear();
         }
         let Some(dialog) = self.ui.dialog.clone() else { return };
         let t = self.tokens.clone();
@@ -73,7 +77,7 @@ impl PierShell {
             PrefPage::ALL.len() as f32 * crate::panels::ROW + 2.0 * list_edge,
         );
         // The vertical separator fills the height it is offered, so offer it exactly the body's.
-        ui.allocate_ui_with_layout(body, egui::Layout::left_to_right(egui::Align::Min), |ui| {
+        let used = ui.allocate_ui_with_layout(body, egui::Layout::left_to_right(egui::Align::Min), |ui| {
             ui.set_min_size(body);
             let list = egui::Frame::NONE.fill(t.bg_content).stroke(t.separator_stroke()).inner_margin(PREF_LIST_INSET);
             list.show(ui, |ui| {
@@ -155,6 +159,7 @@ impl PierShell {
                 }
             });
         });
+        self.probe.fixed.push(("preferences body", body, used.response.rect.size()));
         ui.separator();
         let (mut ok, mut cancel) = (return_pressed(ui), false);
         button_row(ui, |ui| {

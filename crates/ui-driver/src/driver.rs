@@ -257,6 +257,18 @@ impl Driver {
     }
 
     /// Every labelled widget in the accessibility tree.
+    /// Every piece of text the accessibility tree carries: names, and the text of labels (which egui
+    /// puts in the node's value).
+    pub fn texts(&self) -> Vec<String> {
+        self.harness
+            .query_all_by(|_| true)
+            .flat_map(|node| {
+                let n = node.accesskit_node();
+                [n.label(), n.value()].into_iter().flatten().filter(|t| !t.is_empty()).collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
     pub fn widgets(&self) -> Vec<Widget> {
         self.harness
             .query_all_by(|n| n.label().is_some_and(|l| !l.is_empty()))
@@ -309,6 +321,7 @@ impl Driver {
             "pointer": [self.pointer.x, self.pointer.y],
             "groups": groups,
             "launches": self.launches.json(),
+            "fixed": s.probe().fixed.iter().map(|(what, given, used)| json!({"what": what, "given": [given.x, given.y], "used": [used.x, used.y]})).collect::<Vec<_>>(),
         })
     }
 }

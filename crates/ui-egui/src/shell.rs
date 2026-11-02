@@ -76,6 +76,9 @@ pub struct Probe {
     pub groups: Vec<GroupProbe>,
     /// The open modal dialog's frame, if any.
     pub dialog: Option<Rect>,
+    /// Regions drawn into a fixed size: `(what, the size given, the size its contents took)`.
+    /// Contents larger than what they were given push everything after them.
+    pub fixed: Vec<(&'static str, Vec2, Vec2)>,
 }
 
 #[derive(Clone, Debug)]
@@ -186,6 +189,7 @@ impl PierShell {
         self.wanted.clear();
         self.probe.groups.clear();
         self.probe.dialog = None;
+        self.probe.fixed.clear();
         self.wanted_set.clear();
 
         let t = self.tokens.clone();
