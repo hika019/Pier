@@ -7,6 +7,7 @@ pub enum AssetKind {
     Folder,
     /// Formats Pier decodes itself (JPEG, PNG, GIF, WebP, BMP, TIFF).
     Image,
+    /// Camera raw: shown from the camera's embedded JPEG, developed when it has none (decode.rs).
     Raw,
     Layered,
     Vector,
@@ -53,7 +54,7 @@ impl AssetKind {
     }
 
     pub fn has_thumbnail(self) -> bool {
-        matches!(self, Self::Image)
+        matches!(self, Self::Image | Self::Raw)
     }
 }
 

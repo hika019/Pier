@@ -19,6 +19,8 @@ egui_kittest = "0.37"
 # Shared Craft libraries, pinned by immutable revision (AGENTS.md).
 craft-menu = { git = "https://github.com/storytold/craft-libs", rev = "006b50d2ae65f8525e933e82fad1a1fe4e89391f" }
 craft-keymap = { git = "https://github.com/storytold/craft-libs", rev = "006b50d2ae65f8525e933e82fad1a1fe4e89391f", features = ["egui"] }
+# Camera raw decode/develop, pinned by immutable revision (ADR-004: photocraft's standalone L0 crate).
+photocraft-raw = { git = "https://github.com/storytold/photocraft", rev = "289dd0a874763d6528bab2184a87a1b53771c02a" }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff"] }
 kamadak-exif = "0.6"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }

@@ -12,3 +12,8 @@ workspace = true
 [dependencies]
 image = { workspace = true }
 kamadak-exif = { workspace = true }
+photocraft-raw = { workspace = true }
+
+[dev-dependencies]
+# Synthetic raw files (DNG / CR2 / RAF / CR3-preview builders) for decode tests.
+photocraft-raw = { workspace = true, features = ["testgen"] }
