@@ -12,7 +12,7 @@ use pier_engine::{Asset, AssetKind, Event, ImageSize, Worker};
 
 use crate::i18n::{self, S, tr};
 use crate::icons::{self, Icon};
-use crate::state::{Browser, Dialog, Label, PrefDraft, PrefPage, THUMB_MAX, THUMB_MIN, UiState, ViewMode};
+use crate::state::{Browser, Dialog, Label, PrefPage, THUMB_MAX, THUMB_MIN, UiState, ViewMode};
 use crate::theme::Tokens;
 use crate::workspace::{Column, PanelId, Workspace};
 
@@ -111,6 +111,11 @@ pub struct PierShell {
 
 impl PierShell {
     pub fn new(start: PathBuf) -> Self {
+        Self::with_desktop(start, Box::new(craft::System))
+    }
+
+    /// A shell on `desktop`: where Craft Apps are found and programs started (a fake in tests).
+    pub fn with_desktop(start: PathBuf, desktop: Box<dyn Desktop>) -> Self {
         let mut shell = Self {
             browser: Browser::new(PathBuf::new()),
             ui: UiState::default(),
@@ -124,7 +129,7 @@ impl PierShell {
             subfolders: HashMap::new(),
             craft_apps: HashMap::new(),
             launcher: None,
-            desktop: Box::new(craft::System),
+            desktop,
             frame: 0,
             probe: Probe::default(),
             native_menu: None,
@@ -135,12 +140,6 @@ impl PierShell {
         };
         shell.detect_craft_apps();
         shell
-    }
-
-    /// Replaces the desktop (where Craft Apps are found and programs started) and looks again.
-    pub fn set_desktop(&mut self, desktop: Box<dyn Desktop>) {
-        self.desktop = desktop;
-        self.detect_craft_apps();
     }
 
     fn detect_craft_apps(&mut self) {
@@ -214,7 +213,7 @@ impl PierShell {
         i18n::set_lang(lang);
         if self.applied != Some((self.ui.brightness, lang)) {
             if self.applied.is_none() {
-                self.cjk_font = crate::fonts::install_system_cjk(ctx);
+                self.cjk_font = crate::fonts::install_system_fonts(ctx);
             }
             self.tokens = Tokens::for_brightness(self.ui.brightness);
             self.tokens.apply(ctx);
@@ -489,10 +488,7 @@ impl PierShell {
                 self.ui.views.remove(&self.ui.workspace);
                 ctx.memory_mut(|m| m.reset_areas());
             }
-            Action::Preferences => {
-                self.ui.pref_draft = Some(PrefDraft { brightness: self.ui.brightness, lang: self.ui.lang });
-                self.ui.dialog = Some(Dialog::Preferences(PrefPage::General));
-            }
+            Action::Preferences => self.ui.dialog = Some(Dialog::Preferences(PrefPage::General)),
             Action::Back => {
                 if let Some(p) = self.browser.back.pop() {
                     let cur = self.browser.path.clone();
@@ -557,6 +553,7 @@ impl PierShell {
                 None => groups.push((target, vec![a.path.clone()])),
             }
         }
+        let mut missing = Vec::new();
         for (target, files) in groups {
             match target {
                 None => {
@@ -570,9 +567,14 @@ impl PierShell {
                         let r = self.launch(Launch::App { app: path, files });
                         self.report(r);
                     }
-                    None => self.ui.dialog = Some(Dialog::CraftMissing { app, files }),
+                    None => missing.push(Dialog::CraftMissing { app, files }),
                 },
             }
+        }
+        // One prompt per missing app, in turn, so no file is dropped without a word.
+        self.ui.craft_missing_queue = missing.into();
+        if let Some(first) = self.ui.craft_missing_queue.pop_front() {
+            self.ui.dialog = Some(first);
         }
     }
 

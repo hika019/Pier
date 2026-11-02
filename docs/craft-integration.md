@@ -12,7 +12,7 @@ ArtCraft Launcher のカタログ（`craft-launcher/crates/core/src/catalog.rs`�
 
 | アプリ（machine name） | 開く形式（既定の関連付け） | Pier からの連携 |
 |---|---|---|
-| PhotoCraft（`photocraft`） | JPEG、PNG、TIFF、WebP、GIF、BMP、raw 全般（DNG を含む）、PSD、PSB、`.pcraft`、EXR、ORA、KRA、XCF、Affinity | 開く（ダブルクリック・⌘O）、ツール › PhotoCraft、CLI によるサムネイル・書き出し |
+| PhotoCraft（`photocraft`） | JPEG、PNG、TIFF、WebP、GIF、BMP、raw 全般（DNG を含む）、PSD、PSB、`.pcraft`、ORA、KRA、XCF、Affinity Photo（EXR は PhotoCraft が開けるが、Pier はまだ種類を判定せず OS の既定アプリで開く） | 開く（ダブルクリック・⌘O）、ツール › PhotoCraft、CLI によるサムネイル・書き出し |
 | LightCraft（`lightcraft`） | —（ダブルクリックの既定にはしない） | Camera Raw で開く（⌘R、dashboard #3）、カタログに読み込み、DNG 変換 |
 | VectorCraft（`vectorcraft`） | AI、SVG、EPS、`.vectorcraft` | 開く、画像トレース |
 | DesignCraft（`designcraft`） | INDD、IDML、`.designcraft`（要確認） | 開く、配置、コンタクトシート |
@@ -33,10 +33,11 @@ Pier も自前の表を持ち、Bridge の行き先を Craft App に置き換え
 |---|---|---|---|
 | JPEG・PNG・TIFF など | Photoshop | PhotoCraft | ユーザーの実機観察（2026-11-03, Bridge 16.0.8 macOS）、ヘルプ「ネイティブアプリで開く」 |
 | raw（CR3・NEF・DNG など） | Photoshop が起動し、Camera Raw ダイアログを経て開く | PhotoCraft。PhotoCraft も raw を開くと先に Camera Raw ダイアログを出す（`camera_raw_ui::open`、環境設定 `open_in_camera_raw`、センサーデータから現像できた raw のとき） | ユーザーの実機観察（同上）。Bridge 内の Camera Raw で開く設定（「ダブルクリックで Bridge の Camera Raw 設定を編集」、既定オフ）はヘルプ外の情報で要観察 |
-| PSD・PSB | Photoshop | PhotoCraft | 同上 |
+| PSD・PSB | Photoshop | PhotoCraft | ヘルプ「ネイティブアプリで開く」（PSD のネイティブアプリは Photoshop）。実機未確認 |
 | SVG・AI・EPS / INDD・IDML / PDF / 動画 / 音声 | 要観察（既定表の公式資料なし） | VectorCraft / DesignCraft / PdfCraft / FilmCraft / SoundCraft（暫定） | — |
 | フォント・書類・その他 | 要観察 | OS の既定アプリ | — |
 
+- 複数のアプリが未インストールのときは、アプリごとに §4 の誘導を順に出す（黙ってファイルを捨てない）。
 - 実装は `pier_engine::craft::app_for`。テストは `crates/ui-driver/tests/scenarios.rs`（`double_clicking_a_raw_opens_it_in_photocraft` ほか）。
 - 以前の版は「Bridge も OS の関連付けに従う」という誤った前提で、汎用画像を OS の既定アプリ、raw を LightCraft で開いていた。
 

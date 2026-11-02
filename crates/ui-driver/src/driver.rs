@@ -18,6 +18,14 @@ const SETTLE_TIMEOUT: Duration = Duration::from_secs(10);
 const FRAME_DT: f32 = 1.0 / 60.0;
 /// Frames in a row with nothing pending before [`Driver::settle`] returns.
 const QUIET_FRAMES: usize = 3;
+/// After an input, frames drawn while egui asks for a repaint: the frame that changed state, a new
+/// window's invisible sizing pass, and the frame that shows it. A bound, since background loading
+/// keeps asking.
+const AFTER_INPUT_FRAMES: usize = 4;
+/// Half a second at 60 Hz, longer than egui's double-click window (0.3 s): a click this soon after
+/// the previous one would count as its second (or third) click, so the driver waits this long first,
+/// as a person's separate clicks are apart.
+pub const DOUBLE_CLICK_GAP_FRAMES: usize = 30;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -28,8 +36,11 @@ pub struct Config {
     pub workspace: Workspace,
     pub lang: Lang,
     pub theme: Brightness,
-    /// The Craft Apps the fake desktop reports as installed. Nothing is ever started.
+    /// The Craft Apps the fake desktop reports as installed (none by default, so a test states
+    /// what it needs). Nothing is ever started.
     pub installed: Vec<CraftApp>,
+    /// Whether the fake desktop reports ArtCraft Launcher as installed.
+    pub launcher: bool,
 }
 
 impl Default for Config {
@@ -42,6 +53,7 @@ impl Default for Config {
             lang: Lang::En,
             theme: Brightness::Darkest,
             installed: Vec::new(),
+            launcher: false,
         }
     }
 }
@@ -59,8 +71,12 @@ pub struct Driver {
     pub dir: PathBuf,
     /// What Pier asked the desktop to start, in order.
     pub launches: crate::desktop::Launches,
+    /// The fake desktop's installed Craft Apps; change it to install or remove one mid-test.
+    pub installed: crate::desktop::Installed,
     pointer: Pos2,
     modifiers: Modifiers,
+    /// Frames drawn since the last click, to keep separate clicks apart.
+    since_click: usize,
 }
 
 impl Driver {
@@ -70,8 +86,9 @@ impl Driver {
             None => crate::demo::temp("driver")?,
         };
         let launches = crate::desktop::Launches::default();
-        let mut shell = PierShell::new(dir.clone());
-        shell.set_desktop(Box::new(crate::desktop::FakeDesktop::new(config.installed, launches.clone())));
+        let installed = crate::desktop::Installed::new(config.installed);
+        let desktop = crate::desktop::FakeDesktop::new(installed.clone(), config.launcher, launches.clone());
+        let mut shell = PierShell::with_desktop(dir.clone(), Box::new(desktop));
         shell.ui_state_mut().workspace = config.workspace;
         shell.ui_state_mut().lang = LangSetting::Fixed(config.lang);
         shell.ui_state_mut().brightness = config.theme;
@@ -80,7 +97,7 @@ impl Driver {
             .with_pixels_per_point(config.scale)
             .with_step_dt(FRAME_DT)
             .build_ui_state(|ui, s: &mut PierShell| s.ui(ui), shell);
-        let mut d = Self { harness, dir, launches, pointer: pos2(-10.0, -10.0), modifiers: Modifiers::NONE };
+        let mut d = Self { harness, dir, launches, installed, pointer: pos2(-10.0, -10.0), modifiers: Modifiers::NONE, since_click: DOUBLE_CLICK_GAP_FRAMES };
         d.settle();
         Ok(d)
     }
@@ -95,12 +112,24 @@ impl Driver {
 
     /// Runs one frame.
     pub fn frame(&mut self) {
+        self.step();
+    }
+
+    fn step(&mut self) {
         self.harness.step();
+        self.since_click = self.since_click.saturating_add(1);
+    }
+
+    /// Waits out the double-click window after the previous click, so the next click starts fresh.
+    fn apart_from_last_click(&mut self) {
+        while self.since_click < DOUBLE_CLICK_GAP_FRAMES {
+            self.step();
+        }
     }
 
     pub fn frames(&mut self, n: usize) {
         for _ in 0..n {
-            self.harness.step();
+            self.step();
         }
     }
 
@@ -109,7 +138,7 @@ impl Driver {
         let deadline = Instant::now() + SETTLE_TIMEOUT;
         let mut quiet = 0;
         while Instant::now() < deadline {
-            self.harness.step();
+            self.step();
             quiet = if self.shell().is_idle() { quiet + 1 } else { 0 };
             if quiet >= QUIET_FRAMES {
                 return true;
@@ -121,14 +150,14 @@ impl Driver {
 
     pub fn resize(&mut self, size: Vec2) {
         self.harness.set_size(size);
-        self.harness.step();
+        self.step();
     }
 
     /// Moves the pointer to `to` and runs a frame, like a real mouse move.
     pub fn move_to(&mut self, to: Pos2) {
         self.pointer = to;
         self.harness.event(Event::PointerMoved(to));
-        self.harness.step();
+        self.step();
     }
 
     /// Moves the pointer from `from` to `to` in `steps` frames.
@@ -141,10 +170,14 @@ impl Driver {
 
     pub fn press(&mut self, button: PointerButton, pressed: bool) {
         self.harness.event(Event::PointerButton { pos: self.pointer, button, pressed, modifiers: self.modifiers });
-        self.harness.step();
+        if !pressed {
+            self.since_click = 0;
+        }
+        self.step();
     }
 
     pub fn click_at(&mut self, at: Pos2, button: PointerButton, modifiers: Modifiers) {
+        self.apart_from_last_click();
         self.move_to(at);
         // The app reads held keys from the input state, which the OS updates with ModifiersChanged;
         // the modifiers on the button event alone are not seen.
@@ -154,17 +187,30 @@ impl Driver {
         self.press(button, false);
         self.modifiers = Modifiers::NONE;
         self.harness.event(Event::ModifiersChanged(Modifiers::NONE));
-        // The frame that handled the click changed state after drawing; the app repaints, and so do we.
-        self.harness.step();
+        self.after_input();
+    }
+
+    /// The frame that handled an input changed state after drawing it; the app repaints until egui
+    /// stops asking, and so do we (bounded), so the next query sees the result.
+    fn after_input(&mut self) {
+        self.step();
+        for _ in 0..AFTER_INPUT_FRAMES {
+            if !self.harness.ctx.has_requested_repaint() {
+                break;
+            }
+            self.step();
+        }
     }
 
     /// Two clicks a frame apart, as a real double-click arrives (egui needs separate frames to see two).
     pub fn double_click_at(&mut self, at: Pos2) {
+        self.apart_from_last_click();
         self.move_to(at);
         for _ in 0..2 {
             self.press(PointerButton::Primary, true);
             self.press(PointerButton::Primary, false);
         }
+        self.after_input();
     }
 
     /// Presses at `from`, moves to `to` in `steps` frames, releases.
@@ -173,6 +219,7 @@ impl Driver {
         self.press(PointerButton::Primary, true);
         self.move_path(from, to, steps);
         self.press(PointerButton::Primary, false);
+        self.after_input();
     }
 
     pub fn scroll_at(&mut self, at: Pos2, delta: Vec2) {
@@ -184,18 +231,17 @@ impl Driver {
             source: egui::MouseWheelSource::Unknown,
             modifiers: Modifiers::NONE,
         });
-        self.harness.step();
+        self.after_input();
     }
 
     pub fn key(&mut self, key: Key, modifiers: Modifiers) {
         self.harness.key_press_modifiers(modifiers, key);
-        self.harness.step();
-        self.harness.step();
+        self.after_input();
     }
 
     pub fn type_text(&mut self, text: &str) {
         self.harness.event(Event::Text(text.to_owned()));
-        self.harness.step();
+        self.after_input();
     }
 
     /// The first widget whose accessible label is exactly `label` (or contains it, when `contains`).
@@ -257,6 +303,8 @@ impl Driver {
             "fullScreen": u.full_screen.as_ref().map(name),
             "toast": u.toast.as_ref().map(|t| t.0.clone()),
             "thumbSize": u.thumb_size,
+            "brightness": format!("{:?}", u.brightness),
+            "lang": format!("{:?}", u.lang),
             "panelsHidden": u.panels_hidden,
             "pointer": [self.pointer.x, self.pointer.y],
             "groups": groups,

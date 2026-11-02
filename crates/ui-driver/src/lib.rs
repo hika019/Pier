@@ -12,4 +12,4 @@ pub mod desktop;
 mod driver;
 pub mod script;
 
-pub use driver::{Config, Driver, Widget};
+pub use driver::{Config, DOUBLE_CLICK_GAP_FRAMES, Driver, Widget};

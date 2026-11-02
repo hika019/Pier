@@ -65,6 +65,8 @@ pub struct Tokens {
     pub fg_icon: Color32,
     pub fg_strong: Color32,
     pub accent: Color32,
+    /// Text on an accent fill (the default button).
+    pub fg_on_accent: Color32,
     pub star: Color32,
     pub star_off: Color32,
     pub reject: Color32,
@@ -120,6 +122,7 @@ impl Tokens {
             fg_icon: if brightness.is_dark() { gray(0xb8) } else { gray(0x3a) },
             fg_strong: gray(g[13]),
             accent: Color32::from_rgb(0x2f, 0x8c, 0xf0),
+            fg_on_accent: Color32::WHITE,
             star: if brightness.is_dark() { gray(0xe0) } else { gray(0x20) },
             star_off: if brightness.is_dark() { gray(0x60) } else { gray(0x90) },
             reject: Color32::from_rgb(0xe0, 0x40, 0x40),

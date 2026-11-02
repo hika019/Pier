@@ -36,24 +36,48 @@ impl Launches {
     }
 }
 
+/// The Craft Apps the fake desktop reports, shared so a test can install one while Pier runs.
+#[derive(Clone, Default)]
+pub struct Installed(Arc<Mutex<Vec<CraftApp>>>);
+
+impl Installed {
+    pub fn new(apps: Vec<CraftApp>) -> Self {
+        Self(Arc::new(Mutex::new(apps)))
+    }
+
+    pub fn install(&self, app: CraftApp) {
+        if let Ok(mut apps) = self.0.lock() {
+            apps.push(app);
+        }
+    }
+
+    fn contains(&self, app: CraftApp) -> bool {
+        self.0.lock().is_ok_and(|apps| apps.contains(&app))
+    }
+}
+
+/// Where the fake desktop says ArtCraft Launcher is, when it says it is installed.
+pub const FAKE_LAUNCHER: &str = "/Applications/ArtCraft Launcher.app";
+
 pub struct FakeDesktop {
-    installed: Vec<CraftApp>,
+    installed: Installed,
+    launcher: bool,
     launches: Launches,
 }
 
 impl FakeDesktop {
-    pub fn new(installed: Vec<CraftApp>, launches: Launches) -> Self {
-        Self { installed, launches }
+    pub fn new(installed: Installed, launcher: bool, launches: Launches) -> Self {
+        Self { installed, launcher, launches }
     }
 }
 
 impl Desktop for FakeDesktop {
     fn detect(&self, app: CraftApp) -> Option<PathBuf> {
-        self.installed.contains(&app).then(|| PathBuf::from(format!("/Applications/{}.app", app.name)))
+        self.installed.contains(app).then(|| PathBuf::from(format!("/Applications/{}.app", app.name)))
     }
 
     fn detect_launcher(&self) -> Option<PathBuf> {
-        None
+        self.launcher.then(|| PathBuf::from(FAKE_LAUNCHER))
     }
 
     fn launch(&mut self, launch: Launch) -> Result<(), String> {

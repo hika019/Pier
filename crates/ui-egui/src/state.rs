@@ -458,6 +458,13 @@ pub struct PrefDraft {
     pub lang: LangSetting,
 }
 
+impl PrefDraft {
+    /// The settings as they are now.
+    pub fn of(ui: &UiState) -> Self {
+        Self { brightness: ui.brightness, lang: ui.lang }
+    }
+}
+
 /// Window state that is not about the folder: workspace, theme, language, dialogs.
 pub struct UiState {
     pub workspace: Workspace,
@@ -470,6 +477,8 @@ pub struct UiState {
     pub dialog: Option<Dialog>,
     /// Open while Preferences is.
     pub pref_draft: Option<PrefDraft>,
+    /// Further Craft Apps missing for the files being opened, each asked for after the one before.
+    pub craft_missing_queue: std::collections::VecDeque<Dialog>,
     pub toast: Option<(String, f64)>,
     pub full_screen: Option<PathBuf>,
     pub collapsed_sections: HashSet<S>,
@@ -494,6 +503,7 @@ impl Default for UiState {
             tabs: HashMap::new(),
             dialog: None,
             pref_draft: None,
+            craft_missing_queue: std::collections::VecDeque::new(),
             toast: None,
             full_screen: None,
             collapsed_sections: HashSet::new(),

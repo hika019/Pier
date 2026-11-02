@@ -410,6 +410,8 @@ strings! {
     PrefThumbnails => "Thumbnails", "サムネイル";
     PrefWorkflow => "Workflow", "ワークフロー";
     PrefColorTheme => "Color Theme", "カラーテーマ";
+    NoJapaneseFont => "No Japanese system font was found; Japanese text may not draw.", "日本語のシステムフォントが見つからないため、日本語が表示されない場合があります。";
+    EarlyPrototype => "(early prototype)", "（初期の試作版）";
     BrightnessDarkest => "Darkest", "最も暗い";
     BrightnessDark => "Dark", "暗い";
     BrightnessLight => "Light", "明るい";

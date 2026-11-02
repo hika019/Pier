@@ -4,7 +4,7 @@ use egui::{Key, Modifiers, PointerButton, pos2};
 use std::path::PathBuf;
 
 use pier_engine::craft::Launch;
-use pier_ui_driver::{Config, Driver};
+use pier_ui_driver::{Config, DOUBLE_CLICK_GAP_FRAMES, Driver};
 use pier_ui_egui::i18n::Lang;
 use pier_ui_egui::state::{Dialog, PrefPage};
 use pier_ui_egui::theme::Brightness;
@@ -101,7 +101,7 @@ fn dialog_rect(d: &Driver) -> serde_json::Value {
     d.state()["dialogRect"].clone()
 }
 
-/// Regression: a dialog grew by 17 points every frame (so every mouse move, in the app) until its
+/// Regression: Preferences grew by 34 points every frame (so every mouse move, in the app) until its
 /// buttons left the screen.
 #[test]
 fn dialogs_keep_their_size_while_the_mouse_moves() {
@@ -140,7 +140,8 @@ fn page_variant(name: &str) -> &'static str {
     }
 }
 
-/// Regression: every dialog shared one window id, so About opened after Preferences kept its height.
+/// Regression: with one window id for every dialog and a button row that claimed the whole remaining
+/// height, About opened after Preferences kept Preferences' height.
 #[test]
 fn a_dialog_does_not_inherit_the_size_of_the_previous_one() {
     let mut d = driver(Workspace::Essentials);
@@ -156,9 +157,6 @@ fn a_dialog_does_not_inherit_the_size_of_the_previous_one() {
     assert_eq!(dialog_rect(&d), fresh);
     cleanup(d);
 }
-
-/// Half a second at 60 Hz: longer than egui's double-click window (0.3 s), so two clicks stay two.
-const DOUBLE_CLICK_GAP_FRAMES: usize = 30;
 
 fn with_all_craft_apps() -> Driver {
     Driver::new(Config { installed: pier_engine::craft::ALL.to_vec(), ..Config::default() }).unwrap()
@@ -337,5 +335,173 @@ fn cmd_click_adds_to_the_selection_and_shift_click_selects_a_range() {
     d.click_at(d.find("canyon-10.jpg", false).unwrap().rect.center(), PointerButton::Primary, Modifiers::SHIFT);
     // Range from the anchor (coast-12, the last click) back to canyon-10, in the view's order.
     assert_eq!(d.state()["selection"], serde_json::json!(["canyon-10.jpg", "coast-12.jpg"]));
+    cleanup(d);
+}
+
+/// Return presses the default button (OK), as Escape presses Cancel (docs/ui-design.md §6).
+#[test]
+fn return_presses_ok() {
+    let mut d = driver(Workspace::Essentials);
+    d.key(Key::K, Modifiers::COMMAND);
+    d.click_label("Interface", PointerButton::Primary).unwrap();
+    d.click_label("Lightest", PointerButton::Primary).unwrap();
+    d.key(Key::Enter, Modifiers::NONE);
+    assert!(d.state()["dialog"].is_null(), "Preferences still open");
+    assert_eq!(d.state()["brightness"], "Lightest");
+    d.shell_mut().ui_state_mut().dialog = Some(Dialog::About);
+    d.frames(3);
+    d.key(Key::Enter, Modifiers::NONE);
+    assert!(d.state()["dialog"].is_null(), "About still open");
+    cleanup(d);
+}
+
+/// A change survives switching pages, and a language chosen and kept with OK applies.
+#[test]
+fn preferences_keep_edits_across_pages_and_apply_the_language_on_ok() {
+    let mut d = driver(Workspace::Essentials);
+    d.key(Key::K, Modifiers::COMMAND);
+    d.click_label("Interface", PointerButton::Primary).unwrap();
+    d.click_label("Light", PointerButton::Primary).unwrap();
+    d.click_label("Advanced", PointerButton::Primary).unwrap();
+    d.click_label("日本語", PointerButton::Primary).unwrap();
+    d.click_label("Interface", PointerButton::Primary).unwrap();
+    assert_eq!(d.state()["brightness"], "Darkest", "applied before OK");
+    d.click_label("OK", PointerButton::Primary).unwrap();
+    assert_eq!(d.state()["brightness"], "Light");
+    assert_eq!(d.state()["lang"], "Fixed(Ja)");
+    assert!(d.find("環境設定…", true).is_some() || d.find("ファイル", false).is_some(), "the interface did not switch to Japanese");
+    cleanup(d);
+}
+
+/// Every app that is missing gets its own prompt, one after another; no file is dropped silently.
+#[test]
+fn each_missing_app_is_asked_for_in_turn() {
+    let mut d = driver(Workspace::Essentials);
+    d.click_label("IMG_0412.CR3", PointerButton::Primary).unwrap();
+    for name in ["logo.svg", "teaser.mp4"] {
+        d.frames(DOUBLE_CLICK_GAP_FRAMES);
+        d.click_at(d.find(name, false).unwrap().rect.center(), PointerButton::Primary, Modifiers::COMMAND);
+    }
+    d.key(Key::O, Modifiers::COMMAND);
+    let mut asked = Vec::new();
+    for _ in 0..3 {
+        let dialog = d.state()["dialog"].as_str().unwrap_or_default().to_owned();
+        assert!(dialog.starts_with("CraftMissing"), "{dialog}");
+        asked.push(dialog);
+        d.click_label("Cancel", PointerButton::Primary).unwrap();
+    }
+    assert!(d.state()["dialog"].is_null());
+    for (app, file) in [("photocraft", "IMG_0412.CR3"), ("vectorcraft", "logo.svg"), ("filmcraft", "teaser.mp4")] {
+        assert!(asked.iter().any(|a| a.contains(app) && a.contains(file)), "{app} {file}: {asked:?}");
+    }
+    assert!(launched(&d).is_empty());
+    cleanup(d);
+}
+
+/// Regression: every dialog shared one window, so a dialog's first frame took the size of the one
+/// open before it.
+#[test]
+fn a_reopened_dialog_has_its_own_size_from_its_first_frame() {
+    let mut d = driver(Workspace::Essentials);
+    d.shell_mut().ui_state_mut().dialog = Some(Dialog::About);
+    d.frames(3);
+    let about = dialog_rect(&d);
+    d.shell_mut().ui_state_mut().dialog = Some(Dialog::Preferences(PrefPage::General));
+    d.frames(3);
+    d.shell_mut().ui_state_mut().dialog = Some(Dialog::About);
+    d.frame();
+    assert_eq!(dialog_rect(&d), about);
+    cleanup(d);
+}
+
+#[test]
+fn reveal_shows_the_file_in_the_file_manager() {
+    let mut d = driver(Workspace::Essentials);
+    d.click_label("dunes-01.jpg", PointerButton::Primary).unwrap();
+    d.click_label("File", PointerButton::Primary).unwrap();
+    d.click_label(if cfg!(target_os = "macos") { "Reveal in Finder" } else { "Reveal in" }, PointerButton::Primary).unwrap();
+    assert_eq!(launched(&d), [Launch::Reveal(d.dir.join("dunes-01.jpg"))]);
+    cleanup(d);
+}
+
+/// The prompt for a missing app: its buttons open the download page, the app's page, or the file in
+/// the OS default app; Cancel starts nothing.
+#[test]
+fn the_missing_app_prompt_buttons_do_what_they_say() {
+    let mut d = driver(Workspace::Essentials);
+    let cr3 = d.dir.join("IMG_0412.CR3");
+    let open_missing = |d: &mut Driver| {
+        let w = d.find("IMG_0412.CR3", false).unwrap();
+        d.double_click_at(w.rect.center());
+        d.frames(DOUBLE_CLICK_GAP_FRAMES);
+    };
+    open_missing(&mut d);
+    d.click_label("Download ArtCraft Launcher", PointerButton::Primary).unwrap();
+    assert_eq!(launched(&d), [Launch::Default(pier_engine::craft::LAUNCHER_DOWNLOAD_URL.into())]);
+    d.click_label("Open the PhotoCraft page", PointerButton::Primary).unwrap();
+    assert_eq!(launched(&d), [Launch::Default(pier_engine::craft::PHOTOCRAFT.page_url().into())]);
+    d.click_label("Open with the Default App", PointerButton::Primary).unwrap();
+    assert_eq!(launched(&d), [Launch::Default(cr3.clone().into_os_string())]);
+    assert!(d.state()["dialog"].is_null());
+    open_missing(&mut d);
+    d.click_label("Cancel", PointerButton::Primary).unwrap();
+    assert!(launched(&d).is_empty());
+    cleanup(d);
+}
+
+#[test]
+fn the_missing_app_prompt_opens_artcraft_launcher_when_it_is_installed() {
+    let mut d = Driver::new(Config { launcher: true, ..Config::default() }).unwrap();
+    let w = d.find("IMG_0412.CR3", false).unwrap();
+    d.double_click_at(w.rect.center());
+    d.click_label("Open ArtCraft Launcher", PointerButton::Primary).unwrap();
+    assert_eq!(launched(&d), [Launch::App { app: pier_ui_driver::desktop::FAKE_LAUNCHER.into(), files: Vec::new() }]);
+    cleanup(d);
+}
+
+/// Installing PhotoCraft while Pier runs: Refresh (F5) looks for the Craft Apps again.
+#[test]
+fn refresh_finds_a_craft_app_installed_while_pier_runs() {
+    let mut d = driver(Workspace::Essentials);
+    d.installed.install(pier_engine::craft::PHOTOCRAFT);
+    d.key(Key::F5, Modifiers::NONE);
+    d.settle();
+    let w = d.find("dunes-01.jpg", false).unwrap();
+    d.double_click_at(w.rect.center());
+    assert_eq!(launched(&d), [app("PhotoCraft", &[d.dir.join("dunes-01.jpg")])]);
+    cleanup(d);
+}
+
+/// Every menu draws every character, in both languages (a missing glyph panics in the harness and
+/// shows as a box in the app). Regression: ⌘⌫ in File was a box.
+#[test]
+fn every_menu_draws_without_missing_characters() {
+    for (lang, menus) in [
+        (Lang::En, ["File", "Edit", "View", "Stacks", "Label", "Tools", "Window", "Help"]),
+        (Lang::Ja, ["ファイル", "編集", "表示", "スタック", "ラベル", "ツール", "ウィンドウ", "ヘルプ"]),
+    ] {
+        let mut d = Driver::new(Config { lang, ..Config::default() }).unwrap();
+        for menu in menus {
+            d.click_label(menu, PointerButton::Primary).unwrap_or_else(|e| panic!("{lang:?} {menu}: {e}"));
+            d.key(Key::Escape, Modifiers::NONE);
+        }
+        cleanup(d);
+    }
+}
+
+/// An edit left in Preferences when another dialog replaced it is gone the next time Preferences
+/// opens, however it is opened (here by setting the dialog, as a control channel would).
+#[test]
+fn a_new_preferences_session_starts_from_the_current_settings() {
+    let mut d = driver(Workspace::Essentials);
+    d.shell_mut().ui_state_mut().dialog = Some(Dialog::Preferences(PrefPage::Interface));
+    d.frames(3);
+    d.click_label("Lightest", PointerButton::Primary).unwrap();
+    d.shell_mut().ui_state_mut().dialog = Some(Dialog::About);
+    d.frames(3);
+    d.shell_mut().ui_state_mut().dialog = Some(Dialog::Preferences(PrefPage::Interface));
+    d.frames(3);
+    d.click_label("OK", PointerButton::Primary).unwrap();
+    assert_eq!(d.state()["brightness"], "Darkest");
     cleanup(d);
 }
