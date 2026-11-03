@@ -1,5 +1,8 @@
 # Thread counts and the per-test time limit (CLAUDE.md: local 6 / CI 3 threads, 3 minutes a test).
 
+# CI runs this version; older ones warn (GHSA-vc25-qg58-w57c is fixed in it).
+nextest-version = { recommended = "0.9.150" }
+
 [profile.default]
 test-threads = 6
 # Reported as slow after a minute, killed after three.

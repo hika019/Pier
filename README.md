@@ -9,8 +9,9 @@ Browse folders as thumbnails, preview, rate, label, add keywords, edit metadata,
 collections and stacks, then hand files to [storytold's Craft Apps](https://github.com/storytold) for editing
 (PhotoCraft, LightCraft, VectorCraft, DesignCraft, PdfCraft, FilmCraft and more).
 
-- Pier works with the **Craft Apps in place of** Photoshop, Camera Raw, Illustrator and InDesign. When an app is
-  missing, it points you to [ArtCraft Launcher](https://github.com/storytold/craft-launcher) to install it.
+- Pier **assumes the Craft Apps are installed** and works with them in place of Photoshop, Camera Raw, Illustrator
+  and InDesign. When an app is missing, it points you to [ArtCraft Launcher](https://github.com/storytold/craft-launcher)
+  to install it.
 - Layout and conventions follow [storytold/photocraft](https://github.com/storytold/photocraft): a native
   egui/eframe + wgpu UI with no webview, Rust 1.95.0 pinned (photocraft's minimum, 1.95), edition 2024, and
   [craft-libs](https://github.com/storytold/craft-libs) at a fixed revision.
