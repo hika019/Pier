@@ -1,52 +1,64 @@
 # Pier
 
-**Pier は Adobe Bridge 相当のデジタルアセットブラウザを、pure Rust でクリーンルーム再実装するプロジェクトです。**
-フォルダを辿ってサムネイルで素材を一覧し、プレビュー・レーティング・ラベル・キーワード・メタデータ編集・
-一括リネーム・コレクション・スタックで整理して、編集は [storytold の Craft Apps](https://github.com/storytold)
-（PhotoCraft、LightCraft、VectorCraft、DesignCraft、PdfCraft、FilmCraft など）へ渡します。
+**English** | [日本語](README.ja.md)
 
-- Photoshop / Camera Raw / Illustrator / InDesign の代わりに **Craft Apps が入っている前提** で連携します。
-  入っていなければ [ArtCraft Launcher](https://github.com/storytold/craft-launcher) でのインストールへ誘導します。
-- 構成・規約は [storytold/photocraft](https://github.com/storytold/photocraft) に揃えます
-  （egui/eframe + wgpu のネイティブ UI、Webview なし、Rust 1.95.0 固定（photocraft の下限 1.95 と同じ）、edition 2024、[craft-libs](https://github.com/storytold/craft-libs) を rev 固定で利用）。
+[![CI](https://github.com/hika019/Pier/actions/workflows/ci.yml/badge.svg)](https://github.com/hika019/Pier/actions/workflows/ci.yml)
 
-> ステータス: **最初の試作**。Bridge と同じ画面構成で、フォルダー閲覧・サムネイル・プレビュー・メタデータ表示・並べ替え・
-> フィルター・★／ラベル（セッション内のみ）・Craft App で開く、が動きます。それ以外のメニューやパネルは配置だけで、
-> 「今後実装予定」と表示されます。mac ではメニューは OS のメニューバーに出ます。英語・日本語に対応（環境設定 › 高度な設定 › 言語、または `PIER_LOCALE=ja`）。
+**Pier is a clean-room, pure-Rust digital asset browser in the spirit of Adobe Bridge.**
+Browse folders as thumbnails, preview, rate, label, add keywords, edit metadata, batch-rename, and organise with
+collections and stacks, then hand files to [storytold's Craft Apps](https://github.com/storytold) for editing
+(PhotoCraft, LightCraft, VectorCraft, DesignCraft, PdfCraft, FilmCraft and more).
 
-## 動かし方
+- Pier works with the **Craft Apps in place of** Photoshop, Camera Raw, Illustrator and InDesign. When an app is
+  missing, it points you to [ArtCraft Launcher](https://github.com/storytold/craft-launcher) to install it.
+- Layout and conventions follow [storytold/photocraft](https://github.com/storytold/photocraft): a native
+  egui/eframe + wgpu UI with no webview, Rust 1.95.0 pinned (photocraft's minimum, 1.95), edition 2024, and
+  [craft-libs](https://github.com/storytold/craft-libs) at a fixed revision.
+
+> Status: **early prototype.** The window is laid out like Bridge's. Working: folder browsing, thumbnails, preview,
+> metadata, sorting, filters, ratings and labels (for the session only), and opening files in a Craft App (images
+> and camera raws go to PhotoCraft, as Bridge sends them to Photoshop; raws open through Camera Raw first). Other
+> menus and panels are in place and say "coming soon". On macOS the menus live in the system menu bar. English and
+> Japanese (Preferences › Advanced › Language, or `PIER_LOCALE=ja`).
+
+## Running
 
 ```sh
-cargo run -p pier                 # ピクチャフォルダーを開く
-cargo run -p pier -- ~/Photos     # フォルダーを指定
-cargo run -p pier-ui-driver --bin pier-drive -- --lang ja --steps '[{"op":"screenshot","path":"shot.png"}]'   # オフスクリーンで操作・撮影（docs/debugging.md）
-cargo test --workspace
+cargo run -p pier                 # opens your Pictures folder
+cargo run -p pier -- ~/Photos     # opens a folder of your choice
+cargo run -p pier-ui-driver --bin pier-drive -- --lang ja --steps '[{"op":"screenshot","path":"shot.png"}]'   # drive and capture offscreen (docs/debugging.md)
+cargo nextest run --workspace     # the tests, as CI runs them (doctests: cargo test --doc --workspace)
 ```
 
-Rust は `rust-toolchain.toml` により 1.95.0 が使われます（rustup が自動で入れます）。
+`rust-toolchain.toml` selects Rust 1.95.0; rustup installs it on first use.
 
-## ドキュメント
+GitHub Actions runs the tests on every push: tests on macOS and Ubuntu, fmt and clippy on Ubuntu, and a build
+check on Windows ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
-| ドキュメント | 内容 |
+## Documentation
+
+The design documents are written in Japanese.
+
+| Document | What it covers |
 |---|---|
-| [AGENTS.md](AGENTS.md) | 実装者・AI エージェント向けの規約（最初に読む） |
-| [CLAUDE.md](CLAUDE.md) | エージェント運用の一次ソース（lead / subagent、git、レビュー、テスト） |
-| [dashboard.md](dashboard.md) | ユーザー判断待ちの事項（空が正常） |
-| [.claude/skills/](.claude/skills/) | 作業別手順：bug-frontier、session-recovery、parity-observation（Bridge 観察）、ui-verify |
-| [docs/overview.md](docs/overview.md) | 製品概要・目的・スコープ・用語 |
-| [docs/requirements.md](docs/requirements.md) | 機能要件・非機能要件（ID 付き、優先度付き） |
-| [docs/architecture.md](docs/architecture.md) | 概要設計：ワークスペース構成、レイヤー、スレッド、データフロー |
-| [docs/data-model.md](docs/data-model.md) | データモデル、キャッシュ DB、メタデータの書き込み方針 |
-| [docs/ui-design.md](docs/ui-design.md) | 画面設計：ワークスペース、パネル、ダイアログ |
-| [docs/command-catalog.md](docs/command-catalog.md) | メニュー・コマンド ID・ショートカットの一覧 |
-| [docs/file-formats.md](docs/file-formats.md) | 対応フォーマットとサムネイル／プレビュー生成方針 |
-| [docs/craft-integration.md](docs/craft-integration.md) | Craft Apps との連携・インストール誘導 |
-| [docs/testing.md](docs/testing.md) | テスト戦略・性能予算 |
-| [docs/debugging.md](docs/debugging.md) | AI も使えるデバッグ環境（オフスクリーン操作・PNG・状態 JSON） |
-| [docs/roadmap.md](docs/roadmap.md) | マイルストーンと完了条件 |
-| [docs/decisions.md](docs/decisions.md) | 設計判断の記録（ADR） |
+| [AGENTS.md](AGENTS.md) | Rules for contributors and AI agents (read first) |
+| [CLAUDE.md](CLAUDE.md) | How agents work in this repository: lead and subagents, git, review, tests |
+| [dashboard.md](dashboard.md) | Decisions waiting on the maintainer (empty is normal) |
+| [.claude/skills/](.claude/skills/) | Task procedures: bug-frontier, session-recovery, parity-observation (observing Bridge), ui-verify |
+| [docs/overview.md](docs/overview.md) | Product overview, goals, scope and terms |
+| [docs/requirements.md](docs/requirements.md) | Functional and non-functional requirements, with IDs and priorities |
+| [docs/architecture.md](docs/architecture.md) | Architecture: workspace layout, layers, threads and data flow |
+| [docs/data-model.md](docs/data-model.md) | Data model, cache database and how metadata is written |
+| [docs/ui-design.md](docs/ui-design.md) | Screen design: workspaces, panels and dialogs |
+| [docs/command-catalog.md](docs/command-catalog.md) | Menus, command IDs and shortcuts |
+| [docs/file-formats.md](docs/file-formats.md) | Supported formats and how thumbnails and previews are made |
+| [docs/craft-integration.md](docs/craft-integration.md) | Working with the Craft Apps, and guiding installation |
+| [docs/testing.md](docs/testing.md) | Test strategy and performance budgets |
+| [docs/debugging.md](docs/debugging.md) | The debugging environment, usable by AI too: offscreen input, PNGs and state JSON |
+| [docs/roadmap.md](docs/roadmap.md) | Milestones and their exit criteria |
+| [docs/decisions.md](docs/decisions.md) | Architecture decision records (ADRs) |
 
-## ライセンス
+## License
 
-[MIT](LICENSE)。Adobe、Adobe Bridge、Photoshop は Adobe Inc. の商標です。Pier は Adobe とは無関係で、
-Adobe のコード・アイコン・アセットを一切含みません（[AGENTS.md](AGENTS.md) のクリーンルーム規則を参照）。
+[MIT](LICENSE). Adobe, Adobe Bridge and Photoshop are trademarks of Adobe Inc. Pier is not affiliated with Adobe
+and contains no Adobe code, icons or assets (see the clean-room rules in [AGENTS.md](AGENTS.md)).
