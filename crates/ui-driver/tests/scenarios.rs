@@ -419,7 +419,14 @@ fn reveal_shows_the_file_in_the_file_manager() {
     let mut d = driver(Workspace::Essentials);
     d.click_label("dunes-01.jpg", PointerButton::Primary).unwrap();
     d.click_label("File", PointerButton::Primary).unwrap();
-    d.click_label(if cfg!(target_os = "macos") { "Reveal in Finder" } else { "Reveal in" }, PointerButton::Primary).unwrap();
+    let reveal = if cfg!(target_os = "macos") {
+        "Reveal in Finder"
+    } else if cfg!(windows) {
+        "Reveal in Explorer"
+    } else {
+        "Show in File Manager"
+    };
+    d.click_label(reveal, PointerButton::Primary).unwrap();
     assert_eq!(launched(&d), [Launch::Reveal(d.dir.join("dunes-01.jpg"))]);
     cleanup(d);
 }
