@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use egui::{CentralPanel, Color32, Context, Frame, Id, Key, KeyboardShortcut, Modifiers, Rect, Sense, TextureHandle, Ui, UiBuilder, Vec2, vec2};
-use pier_engine::craft::{self, CraftApp};
+use pier_engine::craft::{self, CraftApp, Desktop, Launch};
 use pier_engine::meta::MetaSummary;
 use pier_engine::{Asset, AssetKind, Event, ImageSize, Worker};
 
@@ -74,6 +74,11 @@ pub enum Action {
 pub struct Probe {
     /// Every tabbed panel group, in drawing order.
     pub groups: Vec<GroupProbe>,
+    /// The open modal dialog's frame, if any.
+    pub dialog: Option<Rect>,
+    /// Regions drawn into a fixed size: `(what, the size given, the size its contents took)`.
+    /// Contents larger than what they were given push everything after them.
+    pub fixed: Vec<(&'static str, Vec2, Vec2)>,
 }
 
 #[derive(Clone, Debug)]
@@ -97,8 +102,9 @@ pub struct PierShell {
     pub(crate) subfolders: HashMap<PathBuf, Option<Result<Vec<PathBuf>, String>>>,
     pub(crate) craft_apps: HashMap<&'static str, Option<PathBuf>>,
     pub(crate) launcher: Option<PathBuf>,
+    desktop: Box<dyn Desktop>,
     pub(crate) frame: u64,
-    probe: Probe,
+    pub(crate) probe: Probe,
     pub(crate) native_menu: Option<craft_menu::NativeMenu>,
     pending: Vec<Action>,
     start: PathBuf,
@@ -108,8 +114,12 @@ pub struct PierShell {
 
 impl PierShell {
     pub fn new(start: PathBuf) -> Self {
-        let craft_apps = craft::ALL.iter().map(|a| (a.id, craft::detect(*a))).collect();
-        Self {
+        Self::with_desktop(start, Box::new(craft::System))
+    }
+
+    /// A shell on `desktop`: where Craft Apps are found and programs started (a fake in tests).
+    pub fn with_desktop(start: PathBuf, desktop: Box<dyn Desktop>) -> Self {
+        let mut shell = Self {
             browser: Browser::new(PathBuf::new()),
             ui: UiState::default(),
             tokens: Tokens::for_brightness(crate::theme::Brightness::Darkest),
@@ -120,8 +130,9 @@ impl PierShell {
             last_wanted: HashSet::new(),
             meta: HashMap::new(),
             subfolders: HashMap::new(),
-            craft_apps,
-            launcher: craft::detect_launcher(),
+            craft_apps: HashMap::new(),
+            launcher: None,
+            desktop,
             frame: 0,
             probe: Probe::default(),
             native_menu: None,
@@ -129,7 +140,18 @@ impl PierShell {
             start,
             applied: None,
             cjk_font: None,
-        }
+        };
+        shell.detect_craft_apps();
+        shell
+    }
+
+    fn detect_craft_apps(&mut self) {
+        self.craft_apps = craft::ALL.iter().map(|a| (a.id, self.desktop.detect(*a))).collect();
+        self.launcher = self.desktop.detect_launcher();
+    }
+
+    pub(crate) fn launch(&mut self, launch: Launch) -> Result<(), String> {
+        self.desktop.launch(launch)
     }
 
     pub fn probe(&self) -> &Probe {
@@ -166,6 +188,8 @@ impl PierShell {
         self.handle_keys(&ctx, &menus);
         self.wanted.clear();
         self.probe.groups.clear();
+        self.probe.dialog = None;
+        self.probe.fixed.clear();
         self.wanted_set.clear();
 
         let t = self.tokens.clone();
@@ -193,7 +217,7 @@ impl PierShell {
         i18n::set_lang(lang);
         if self.applied != Some((self.ui.brightness, lang)) {
             if self.applied.is_none() {
-                self.cjk_font = crate::fonts::install_system_cjk(ctx);
+                self.cjk_font = crate::fonts::install_system_fonts(ctx);
             }
             self.tokens = Tokens::for_brightness(self.ui.brightness);
             self.tokens.apply(ctx);
@@ -429,8 +453,9 @@ impl PierShell {
             Action::OpenWith(app) => self.open_selection(app, true),
             Action::OpenInCameraRaw => self.open_selection(Some(craft::LIGHTCRAFT), true),
             Action::Reveal => {
-                if let Some(a) = self.browser.selected_assets().first() {
-                    self.report(craft::reveal(&a.path));
+                if let Some(path) = self.browser.selected_assets().first().map(|a| a.path.clone()) {
+                    let r = self.launch(Launch::Reveal(path));
+                    self.report(r);
                 }
             }
             Action::CloseWindow | Action::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
@@ -458,8 +483,7 @@ impl PierShell {
                 self.images.clear();
                 self.meta.clear();
                 self.subfolders.clear();
-                self.craft_apps = craft::ALL.iter().map(|a| (a.id, craft::detect(*a))).collect();
-                self.launcher = craft::detect_launcher();
+                self.detect_craft_apps();
                 self.browser.path = PathBuf::new();
                 self.navigate(p, false);
             }
@@ -533,22 +557,28 @@ impl PierShell {
                 None => groups.push((target, vec![a.path.clone()])),
             }
         }
+        let mut missing = Vec::new();
         for (target, files) in groups {
             match target {
                 None => {
                     for f in &files {
-                        let r = craft::open_default(f.as_os_str());
+                        let r = self.launch(Launch::Default(f.clone().into_os_string()));
                         self.report(r);
                     }
                 }
                 Some(app) => match self.craft_apps.get(app.id).cloned().flatten() {
                     Some(path) => {
-                        let r = craft::open_in_app(&path, &files);
+                        let r = self.launch(Launch::App { app: path, files });
                         self.report(r);
                     }
-                    None => self.ui.dialog = Some(Dialog::CraftMissing { app, files }),
+                    None => missing.push(Dialog::CraftMissing { app, files }),
                 },
             }
+        }
+        // One prompt per missing app, in turn, so no file is dropped without a word.
+        self.ui.craft_missing_queue = missing.into();
+        if let Some(first) = self.ui.craft_missing_queue.pop_front() {
+            self.ui.dialog = Some(first);
         }
     }
 

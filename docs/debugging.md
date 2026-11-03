@@ -28,9 +28,12 @@ cargo run -p pier-ui-driver --bin pier-drive -- --steps '[
 ]'
 ```
 
-- オプション：`--script <file>` / `--steps <json>`、`--dir <folder>`（省略時は自作の風景画で作るデモフォルダー）、
+- オプション：`--launcher yes|no`（ArtCraft Launcher をインストール済みと報告するか、既定 no）、`--script <file>` / `--steps <json>`、`--dir <folder>`（省略時は自作の風景画で作るデモフォルダー）、
   `--out-dir <dir>`（既定 `target/pier-drive`）、`--workspace <id>`、`--lang en|ja`、`--theme darkest|dark|light|lightest`、
-  `--size 1440x900`、`--scale 1`。
+  `--size 1440x900`、`--scale 1`、`--installed all|none|photocraft,lightcraft,...`（偽のデスクトップで「インストール済み」と
+  報告する Craft App。既定 `all`）。
+- **アプリは起動しない。** 起動とアプリ検出は `pier_engine::craft::Desktop` を通り、ドライバーは偽物
+  （`pier_ui_driver::desktop::FakeDesktop`）に差し替える。Pier が起動しようとしたものは状態 JSON の `launches` に残る。
 - 最後に状態 JSON を出力します。失敗した手順があれば `FAILED step N (...)` を出して終了コード 1。
 
 ### 手順（op）
@@ -55,8 +58,24 @@ cargo run -p pier-ui-driver --bin pier-drive -- --steps '[
 
 ### 状態 JSON
 
-`workspace`、`view`、`folder`、`loading`、`visible`（表示中のファイル名）、`selection`、`dialog`、`fullScreen`、`toast`、
-`thumbSize`、`panelsHidden`、`pointer`、`groups`（各パネルグループの `id`・`panels`・`active`・`rect [x, y, w, h]`）。
+`workspace`、`view`、`folder`、`loading`、`visible`（表示中のファイル名）、`selection`、`dialog`、`dialogRect`（開いているダイアログの `[x, y, w, h]`）、`fullScreen`、`toast`、
+`thumbSize`、`panelsHidden`、`pointer`、`groups`（各パネルグループの `id`・`panels`・`active`・`rect [x, y, w, h]`）、
+`brightness`、`lang`、`fixed`（固定サイズで描く領域の `given` と中身が使った `used`。食い違いは、はみ出し）、
+`launches`（起動要求：`{"app": "PhotoCraft", "files": [...]}`、`{"default": ...}`、`{"reveal": ...}`）。
+
+### 入力の再現について
+
+- 修飾キーは、実アプリと同じく `ModifiersChanged` で押下状態として送る（アプリはボタンイベントの修飾キーではなく入力状態を読むため。
+  以前は ⌘クリックが普通のクリックになっていた）。
+- 入力（クリック・ダブルクリック・ドラッグ・スクロール・キー・文字）のあとは、egui が再描画を求める間だけフレームを進める（上限 4）。
+  入力で変わった状態の描画と、新しいダイアログの最初の「見えない採寸の描画」の次の描画まで進むので、直後の `click {label}` や
+  `state` は結果を見る。
+- クリックとダブルクリックは、直前のクリックから自動で 0.5 秒（30 フレーム）空けてから押す。egui は 0.3 秒以内の次のクリックを
+  2 回目（3 回目）として数えるため、空けないと「別の項目を素早く押した」がダブルクリック（開く）やトリプルクリックになる。
+  ドラッグは待たない。egui は 6pt を超えて動いた押下をクリックとして数えないため。6pt 以内の小さな `drag` はクリックとして数えられるので、
+  直前のクリックと区別したいときは `frames` を 30 挟む。
+- 偽のデスクトップ：`Config { installed, launcher, .. }`（pier-drive では `--installed`、`--launcher yes`）。テスト中に
+  `driver.installed.install(app)` でインストールした状態にできる（F5 の再検出の確認用）。
 
 ## AI が調査するときの流れ
 
@@ -78,3 +97,11 @@ cargo run -p pier-ui-driver --bin pier-drive -- --steps '[
 - 切り分け：マウスを動かさず `frames` だけでも 1 フレーム 1pt ずつ縮んだので、原因は毎フレームの描画だった（実アプリではマウスを動かすたびに再描画されるため、動いて見えた）。
 - 真因：パネルグループが与えられた領域を 1pt 縮めてから確保していたため、サイズ可変パネルが毎フレーム小さい値を覚え直していた。
 - センチネル：`panels_stay_put_while_the_mouse_moves`（全ワークスペースでマウスを動かしても配置が変わらない）。
+
+## 実例：環境設定ウィンドウが伸び続ける（2026-11-03 修正）
+
+- 再現：環境設定を開いて `widgets` で OK ボタンの位置をフレームごとに測ると、1 フレームごとに下へずれ、112 フレームで画面外に出た。ページ名をクリックすると、位置がずれた後の別のページが選ばれた。
+- 切り分け：ダイアログごとに高さを測ると、伸びるのは環境設定だけ。縦の区切り線を外すと止まった。
+- 真因：ダイアログ（自動サイズのウィンドウ）は前のフレームで中身が確保した大きさを覚える。縦の区切り線が「残りの高さ全部」を確保していたため、見出しとボタン行の分が毎フレーム上乗せされた。下のボタン行（`right_to_left`）も残りの高さを全部確保するため一度伸びると縮まず、全ダイアログが同じ Id だったので次に開いたダイアログが大きさを引き継いだ。
+- 約束：ダイアログの中では「残り全部」を確保する部品（縦の区切り線、`with_layout`）に、確保してよい大きさを明示して渡す（`button_row`、環境設定の本体は固定サイズ）。
+- センチネル：`dialogs_keep_their_size_while_the_mouse_moves`、`preferences_pages_are_picked_by_clicking_their_names`、`a_dialog_does_not_inherit_the_size_of_the_previous_one`。

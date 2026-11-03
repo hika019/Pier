@@ -381,50 +381,87 @@ pub enum Dialog {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PrefPage {
     General,
-    Interface,
-    Thumbnails,
-    Playback,
-    Metadata,
-    Keywords,
-    Labels,
-    FileTypes,
-    Cache,
-    MediaCache,
     Advanced,
+    Applications,
+    Cache,
+    CacheManagement,
+    Content,
+    Export,
+    FileTypes,
+    Interface,
+    Keywords,
+    LabelsRatings,
+    MediaCache,
+    Metadata,
     Output,
+    Playback,
+    QuickActions,
+    StartupScripts,
+    Thumbnails,
+    Workflow,
 }
 
 impl PrefPage {
-    pub const ALL: [Self; 12] = [
+    /// Bridge 2026's order on macOS: General and Advanced, then A–Z by the English name
+    /// (docs/ui-design.md §6.1).
+    pub const ALL: [Self; 19] = [
         Self::General,
-        Self::Interface,
-        Self::Thumbnails,
-        Self::Playback,
-        Self::Metadata,
-        Self::Keywords,
-        Self::Labels,
-        Self::FileTypes,
-        Self::Cache,
-        Self::MediaCache,
         Self::Advanced,
+        Self::Applications,
+        Self::Cache,
+        Self::CacheManagement,
+        Self::Content,
+        Self::Export,
+        Self::FileTypes,
+        Self::Interface,
+        Self::Keywords,
+        Self::LabelsRatings,
+        Self::MediaCache,
+        Self::Metadata,
         Self::Output,
+        Self::Playback,
+        Self::QuickActions,
+        Self::StartupScripts,
+        Self::Thumbnails,
+        Self::Workflow,
     ];
 
     pub fn name(self) -> S {
         match self {
             Self::General => S::PrefGeneral,
-            Self::Interface => S::PrefInterface,
-            Self::Thumbnails => S::PrefThumbnails,
-            Self::Playback => S::PrefPlayback,
-            Self::Metadata => S::PrefMetadata,
-            Self::Keywords => S::PrefKeywords,
-            Self::Labels => S::PrefLabels,
-            Self::FileTypes => S::PrefFileTypes,
-            Self::Cache => S::PrefCache,
-            Self::MediaCache => S::PrefMediaCache,
             Self::Advanced => S::PrefAdvanced,
+            Self::Applications => S::PrefApplications,
+            Self::Cache => S::PrefCache,
+            Self::CacheManagement => S::PrefCacheManagement,
+            Self::Content => S::PrefContent,
+            Self::Export => S::PrefExport,
+            Self::FileTypes => S::PrefFileTypes,
+            Self::Interface => S::PrefInterface,
+            Self::Keywords => S::PrefKeywords,
+            Self::LabelsRatings => S::PrefLabelsRatings,
+            Self::MediaCache => S::PrefMediaCache,
+            Self::Metadata => S::PrefMetadata,
             Self::Output => S::PrefOutput,
+            Self::Playback => S::PrefPlayback,
+            Self::QuickActions => S::PrefQuickActions,
+            Self::StartupScripts => S::PrefStartupScripts,
+            Self::Thumbnails => S::PrefThumbnails,
+            Self::Workflow => S::PrefWorkflow,
         }
+    }
+}
+
+/// The settings being edited in Preferences: OK keeps them, Cancel and Escape drop them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PrefDraft {
+    pub brightness: Brightness,
+    pub lang: LangSetting,
+}
+
+impl PrefDraft {
+    /// The settings as they are now.
+    pub fn of(ui: &UiState) -> Self {
+        Self { brightness: ui.brightness, lang: ui.lang }
     }
 }
 
@@ -438,6 +475,10 @@ pub struct UiState {
     /// Active tab per panel group, keyed by the group's id.
     pub tabs: HashMap<String, usize>,
     pub dialog: Option<Dialog>,
+    /// Open while Preferences is.
+    pub pref_draft: Option<PrefDraft>,
+    /// Further Craft Apps missing for the files being opened, each asked for after the one before.
+    pub craft_missing_queue: std::collections::VecDeque<Dialog>,
     pub toast: Option<(String, f64)>,
     pub full_screen: Option<PathBuf>,
     pub collapsed_sections: HashSet<S>,
@@ -461,6 +502,8 @@ impl Default for UiState {
             views: HashMap::new(),
             tabs: HashMap::new(),
             dialog: None,
+            pref_draft: None,
+            craft_missing_queue: std::collections::VecDeque::new(),
             toast: None,
             full_screen: None,
             collapsed_sections: HashSet::new(),

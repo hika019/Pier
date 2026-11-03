@@ -1,6 +1,6 @@
 # テスト戦略・品質ゲート
 
-> **最終更新:** 2026-11-02
+> **最終更新:** 2026-11-03
 
 ## 1. 原則
 
@@ -40,6 +40,13 @@ cargo xtask perf --quick
 ```
 
 `.config/nextest.toml` はローカル 6 スレッド、CI 3 スレッド（Otspot と同じ）。
+
+**UI テストが要るフォント。** egui_kittest は描けない文字があると失敗する（アプリでは □ になる文字を、テストで見逃さないため）。
+日本語 UI のテストには CJK フォント（macOS は標準の Hiragino、Linux は Noto Sans CJK：`fonts-noto-cjk` など）が要る。
+ショートカットの記号（⌘⌥⇧⌫ など）は macOS の表記でだけ使い（メニューのショートカット表示は egui の `Context::format_shortcut`
+で、記号は macOS のときだけ）、macOS 標準の Apple Symbols で描く。Windows・Linux のショートカット表記は `Ctrl+Backspace` のような
+文字なので、テストに記号フォントは要らない（`fonts.rs` は Windows・Linux でも記号フォントを予備に入れるが、ファイル名などに
+記号が含まれるときのため）。CI ではフォントを入れてから流し、黙ってスキップしない。
 
 ## 4. 機械ゲート（CI で red になるもの）
 
